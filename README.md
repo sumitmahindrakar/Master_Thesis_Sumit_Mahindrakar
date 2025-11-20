@@ -41,6 +41,6 @@ source ~/.bashrc
 5. Run your scripts from the `scripts/` folder:
 
 ```bash
-python scripts/my_simulation.py
+python scripts/main.py
 ```
 
