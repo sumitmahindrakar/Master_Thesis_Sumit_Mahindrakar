@@ -122,7 +122,7 @@ def ApplyMaterialProperties(structure:Kratos.ModelPart) -> None:
     properties[Kratos.POISSON_RATIO]=0.29
 
     # Solve this issue
-    # properties[Kratos.MOMENT]=000
+    properties[Kratos.MOMENT_X]=1
 
 
 #apply BCs ********************
@@ -191,10 +191,10 @@ if __name__ == "__main__":
     # for element in structure.Elements:
     #     print(element.Properties[Kratos.YOUNG_MODULUS])
 
-    print("Displacement - ")
-    node: Kratos.Node = structure.CreateNewNode(6,5,0,0)
-    print(node.GetSolutionStepValue(Kratos.DISPLACEMENT))#get the displacement values of all coord
-    # print(node.GetValue(Kratos.DISPLACEMENT))
-    print("end")
+    # print("Displacement - ")
+    # node: Kratos.Node = structure.CreateNewNode(6,5,0,0)
+    # print(node.GetSolutionStepValue(Kratos.DISPLACEMENT))#get the displacement values of all coord
+    # # print(node.GetValue(Kratos.DISPLACEMENT))
+    # print("end")
 
     

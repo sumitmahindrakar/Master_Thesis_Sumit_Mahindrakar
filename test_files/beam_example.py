@@ -92,7 +92,7 @@ def CreateModel() -> Kratos.Model: #def returns a model
         node.AddDof(Kratos.DISPLACEMENT_Z)
         # print(node)
 
-    print(structure)
+    # print(structure)
     return model
     
 
@@ -105,6 +105,7 @@ def ApplyMaterialProperties(structure:Kratos.ModelPart) -> None:
     # properties[Kratos.CONSTITUTIVE_LAW]=cl
     properties[Kratos.YOUNG_MODULUS]=206.9e9
     properties[Kratos.POISSON_RATIO]=0.29
+    properties[Kratos.CROSS_AREA]= 0.01
 
 
 #apply BCs ********************
@@ -167,9 +168,11 @@ if __name__ == "__main__":
     # print(dir())
 
     #output
-    # vtu_output = Kratos.VtuOutput(model["Structure"])
-    # vtu_output.AddHistoricalVariable(Kratos.DISPLACEMENT)
-    # vtu_output.PrintOutput("test_files/beam")
+    print("vtu")
+    vtu_output = Kratos.VtuOutput(model["Structure"])
+    vtu_output.AddHistoricalVariable(Kratos.DISPLACEMENT)
+    vtu_output.PrintOutput("test_files/beam")
+    print("end")
 
     # for element in structure.Elements:
     #     print(element.Properties[Kratos.DISPLACEMENT])
@@ -177,9 +180,9 @@ if __name__ == "__main__":
     # for node in structure.Nodes:
     #     print(node.GetValue([Kratos.DISPLACEMENT]))
 
-    print("Displacement - ")
-    node: Kratos.Node = structure.CreateNewNode(12,9,2,0)
-    print(node.GetSolutionStepValue(Kratos.DISPLACEMENT))#get the displacement values of all coord
-    # print(node.GetValue(Kratos.DISPLACEMENT))
-    print("end")
+    # print("Displacement - ")
+    # node: Kratos.Node = structure.CreateNewNode(12,9,2,0)
+    # print(node.GetSolutionStepValue(Kratos.DISPLACEMENT))#get the displacement values of all coord
+    # # print(node.GetValue(Kratos.DISPLACEMENT))
+    # print("end")
     
