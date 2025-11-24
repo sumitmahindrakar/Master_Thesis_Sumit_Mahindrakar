@@ -30,7 +30,7 @@ def CreateAnalysisStageWithFlushInstance(cls, global_model, parameters):
 
 if __name__ == "__main__":
 
-    with open("test_files/structure_3D_test.gid/ProjectParameters.json", 'r') as parameter_file:
+    with open("test_files/frame_3D_test.gid/ProjectParameters.json", 'r') as parameter_file:
         parameters = KratosMultiphysics.Parameters(parameter_file.read())
 
     analysis_stage_module_name = parameters["analysis_stage"].GetString()
