@@ -6,7 +6,7 @@ from PyQt5 import QtWidgets
 import numpy as np
 
 # Load VTK file
-vtk_file = "test_files/beam_2D_test_udl.gid/vtk_output/Structure_0_1.vtk"
+vtk_file = "test_files/beam_2D_test_udl.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"
 mesh = pv.read(vtk_file)
 fields = list(mesh.point_data.keys())
 print("Available fields:", fields)
