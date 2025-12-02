@@ -10,7 +10,7 @@ from mdpa_refiner import parse_mdpa, refine_mesh, write_mdpa
 
 INPUT_FILE = "test_files/frame_2D_test_udl_2_floor_refined.gid/frame_2D_test_udl_2_floor.mdpa"      # Input file name
 OUTPUT_FILE = "test_files/frame_2D_test_udl_2_floor_refined.gid/frame_2D_test_udl_2_floor_refined.mdpa"  # Output file name
-SUBDIVISIONS = 10                 # Number of subdivisions per element
+SUBDIVISIONS = 3                # Number of subdivisions per element
 
 # ===========================================
 
