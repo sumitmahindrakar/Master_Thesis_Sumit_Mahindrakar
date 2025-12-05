@@ -9,7 +9,7 @@ import numpy as np
 def draw_beam_system():
     """Draw a simply supported beam with UDL diagram"""
     
-    fig, ax = plt.subplots(1, 1, figsize=(14, 8))
+    fig, ax = plt.subplots(1, 1, figsize=(14, 8))#14,8
     
     # Beam parameters
     L = 2.0  # Length
@@ -33,11 +33,11 @@ def draw_beam_system():
     # ==================== DRAW UDL ====================
     n_arrows = 15
     arrow_spacing = L / (n_arrows + 1)
-    arrow_length = 0.4
+    arrow_length = 0.05
     load_top = beam_y + beam_height/2 + arrow_length + 0.15
     
     # UDL distribution line
-    ax.plot([0, L], [load_top, load_top], color=load_color, linewidth=2)
+    ax.plot([0+L/2 / (n_arrows + 1)-0.01, L-L / 2/(n_arrows + 1)+0.01], [load_top, load_top], color=load_color, linewidth=2)
     
     # UDL arrows
     for i in range(1, n_arrows + 1):
@@ -61,7 +61,7 @@ def draw_beam_system():
     
     # ==================== DRAW SUPPORTS ====================
     support_width = 0.15
-    support_height = 0.2
+    support_height = 0.15
     
     # Left support (pinned - triangle)
     left_support = plt.Polygon(
@@ -113,16 +113,16 @@ def draw_beam_system():
                 color='black', linewidth=1)
     
     # ==================== DRAW NODES ====================
-    node_positions = [0, 1.0, 2.0]  # Your 3 nodes
+    node_positions = [0, 2.0]  # Your 3 nodes
     for i, x in enumerate(node_positions):
-        circle = plt.Circle((x, beam_y), 0.05, facecolor='white', 
+        circle = plt.Circle((x, beam_y), 0.03, facecolor='black', 
                             edgecolor='black', linewidth=2, zorder=5)
         ax.add_patch(circle)
-        ax.text(x, beam_y - 0.35, f'Node {i+1}', fontsize=11, ha='center',
-                fontweight='bold')
+        # ax.text(x, beam_y - 0.35, f'Node {i+1}', fontsize=11, ha='center',
+        #         fontweight='bold')
     
     # ==================== DIMENSIONS ====================
-    dim_y = beam_y - 0.7
+    dim_y = beam_y - 0.6
     
     # Total length dimension
     ax.annotate('', xy=(0, dim_y), xytext=(L, dim_y),
@@ -131,49 +131,49 @@ def draw_beam_system():
             color=dimension_color, fontweight='bold')
     
     # Element dimensions
-    elem_dim_y = beam_y - 1.1
-    ax.annotate('', xy=(0, elem_dim_y), xytext=(1.0, elem_dim_y),
-               arrowprops=dict(arrowstyle='<->', color='gray', lw=1))
-    ax.text(0.5, elem_dim_y - 0.1, '1.0 m', fontsize=10, ha='center', color='gray')
+    # elem_dim_y = beam_y - 1.1
+    # ax.annotate('', xy=(0, elem_dim_y), xytext=(1.0, elem_dim_y),
+    #            arrowprops=dict(arrowstyle='<->', color='gray', lw=1))
+    # ax.text(0.5, elem_dim_y - 0.1, '1.0 m', fontsize=10, ha='center', color='gray')
     
-    ax.annotate('', xy=(1.0, elem_dim_y), xytext=(2.0, elem_dim_y),
-               arrowprops=dict(arrowstyle='<->', color='gray', lw=1))
-    ax.text(1.5, elem_dim_y - 0.1, '1.0 m', fontsize=10, ha='center', color='gray')
+    # ax.annotate('', xy=(1.0, elem_dim_y), xytext=(2.0, elem_dim_y),
+    #            arrowprops=dict(arrowstyle='<->', color='gray', lw=1))
+    # ax.text(1.5, elem_dim_y - 0.1, '1.0 m', fontsize=10, ha='center', color='gray')
     
     # ==================== ELEMENT LABELS ====================
-    ax.text(0.5, beam_y + 0.02, 'Element 1', fontsize=10, ha='center',
-            color='white', fontweight='bold')
-    ax.text(1.5, beam_y + 0.02, 'Element 2', fontsize=10, ha='center',
-            color='white', fontweight='bold')
+    # ax.text(0.5, beam_y + 0.02, 'Element 1', fontsize=10, ha='center',
+    #         color='white', fontweight='bold')
+    # ax.text(1.5, beam_y + 0.02, 'Element 2', fontsize=10, ha='center',
+            # color='white', fontweight='bold')
     
     # ==================== REACTIONS ====================
     reaction_y = beam_y - beam_height/2 - 0.5
     
     # Left reaction (Ry only, pinned)
-    ax.annotate('', xy=(0, beam_y - beam_height/2 - 0.25),
-               xytext=(0, reaction_y - 0.2),
-               arrowprops=dict(arrowstyle='->', color='green', lw=2))
-    ax.text(0.15, reaction_y - 0.1, '$R_A$ = 10 kN', fontsize=11, color='green',
-            fontweight='bold')
+    ax.annotate('', xy=(0, beam_y - beam_height/2 - 0.35),
+               xytext=(0, reaction_y - 0.1),
+               arrowprops=dict(arrowstyle='-', color='green', lw=2))
+    # ax.text(0.15, reaction_y - 0.1, '$R_A$ = 10 kN', fontsize=11, color='green',
+    #         fontweight='bold')
     
     # Right reaction (Ry only, roller)
     ax.annotate('', xy=(L, beam_y - beam_height/2 - 0.35),
-               xytext=(L, reaction_y - 0.3),
-               arrowprops=dict(arrowstyle='->', color='green', lw=2))
-    ax.text(L - 0.35, reaction_y - 0.2, '$R_B$ = 10 kN', fontsize=11, color='green',
-            fontweight='bold')
+               xytext=(L, reaction_y - 0.1),
+               arrowprops=dict(arrowstyle='-', color='green', lw=2))
+    # ax.text(L - 0.35, reaction_y - 0.2, '$R_B$ = 10 kN', fontsize=11, color='green',
+    #         fontweight='bold')
     
     # ==================== COORDINATE SYSTEM ====================
-    ax.annotate('', xy=(2.5, 1.0), xytext=(2.5, 1.5),
-               arrowprops=dict(arrowstyle='->', color='black', lw=1.5))
-    ax.annotate('', xy=(3.0, 0.5), xytext=(2.5, 0.5),
-               arrowprops=dict(arrowstyle='->', color='black', lw=1.5))
-    ax.text(2.55, 1.55, 'Y', fontsize=11, fontweight='bold')
-    ax.text(3.05, 0.5, 'X', fontsize=11, fontweight='bold')
+    ax.annotate('', xy=(-0.75, 1.49), xytext=(-0.75, 2.0),
+               arrowprops=dict(arrowstyle='<-', color='black', lw=1.5))
+    ax.annotate('', xy=(-0.76, 1.5), xytext=(-0.26, 1.5),
+               arrowprops=dict(arrowstyle='<-', color='black', lw=1.5))
+    ax.text(-0.8, 2.0, 'Y', fontsize=11, fontweight='bold')
+    ax.text(-0.26, 1.55, 'X', fontsize=11, fontweight='bold')
     
     # ==================== TITLE AND INFO BOX ====================
     ax.set_title('Simply Supported Beam with Uniformly Distributed Load (UDL)\n',
-                fontsize=16, fontweight='bold')
+                fontsize=20, fontweight='bold')#16
     
     # Info box
     info_text = (
@@ -182,14 +182,12 @@ def draw_beam_system():
         'E = 210 GPa\n'
         'I = 5×10⁻⁶ m⁴\n'
         'L = 2.0 m\n'
+        'A = 0.00287 m^2\n'
         'w = 10 kN/m\n'
-        '─────────────────\n'
-        'Elements: 2\n'
-        'Nodes: 3'
     )
     props = dict(boxstyle='round', facecolor='lightyellow', alpha=0.9, edgecolor='gray')
-    ax.text(2.6, 2.3, info_text, fontsize=10, verticalalignment='top',
-            fontfamily='monospace', bbox=props)
+    ax.text(2.1, 3.2, info_text, fontsize=12, verticalalignment='top',
+            fontfamily='monospace', bbox=props)#10
     
     # ==================== BOUNDARY CONDITIONS ====================
     bc_text = (
@@ -204,13 +202,13 @@ def draw_beam_system():
         '  • $u_y$ = 0 (fixed)\n'
         '  • $θ_z$ = free'
     )
-    ax.text(-0.7, 0.9, bc_text, fontsize=9, verticalalignment='top',
+    ax.text(-0.7, 3.2, bc_text, fontsize=12, verticalalignment='top',
             fontfamily='monospace', 
-            bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.9, edgecolor='gray'))
+            bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.9, edgecolor='gray'))#9
     
     # ==================== FORMATTING ====================
-    ax.set_xlim(-1, 3.5)
-    ax.set_ylim(0, 3.2)
+    ax.set_xlim(-1.25, 3.25)#-1, 3.5
+    ax.set_ylim(1.0, 3.2)#0.0, 3.2
     ax.set_aspect('equal')
     ax.axis('off')
     
@@ -239,59 +237,60 @@ def draw_analytical_diagrams():
     M = w * L * x / 2 - w * x**2 / 2  # Bending moment
     delta = w * x * (L**3 - 2*L*x**2 + x**3) / (24 * E * I)  # Deflection
     
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    fig, axes = plt.subplots(2, 1, figsize=(8, 6))
     fig.suptitle('Simply Supported Beam with UDL - Analytical Diagrams', 
                  fontsize=14, fontweight='bold')
     
     # ==================== SHEAR FORCE DIAGRAM ====================
-    ax1 = axes[0]
-    ax1.fill_between(x, 0, V/1000, alpha=0.3, color='#E63946')
-    ax1.plot(x, V/1000, color='#E63946', linewidth=2)
-    ax1.axhline(y=0, color='black', linewidth=1)
-    ax1.set_ylabel('Shear Force (kN)', fontsize=11)
-    ax1.set_title('Shear Force Diagram (SFD)', fontsize=12, fontweight='bold')
-    ax1.grid(True, linestyle='--', alpha=0.7)
+    # ax1 = axes[0]
+    # ax1.fill_between(x, 0, V/1000, alpha=0.3, color='#E63946')
+    # ax1.plot(x, V/1000, color='#E63946', linewidth=2)
+    # ax1.axhline(y=0, color='black', linewidth=1)
+    # ax1.set_ylabel('Shear Force (kN)', fontsize=11)
+    # ax1.set_title('Shear Force Diagram (SFD)', fontsize=12, fontweight='bold')
+    # ax1.grid(True, linestyle='--', alpha=0.7)
     
-    # Add values
-    ax1.annotate(f'+{w*L/2/1000:.1f} kN', xy=(0, V[0]/1000), xytext=(0.1, V[0]/1000 + 1),
-                fontsize=10, fontweight='bold', color='#E63946')
-    ax1.annotate(f'{V[-1]/1000:.1f} kN', xy=(L, V[-1]/1000), xytext=(L-0.3, V[-1]/1000 - 1.5),
-                fontsize=10, fontweight='bold', color='#E63946')
-    ax1.plot([L/2], [0], 'ko', markersize=8)
-    ax1.annotate('V = 0', xy=(L/2, 0), xytext=(L/2 + 0.1, 1), fontsize=10)
-    
-    # ==================== BENDING MOMENT DIAGRAM ====================
-    ax2 = axes[1]
-    ax2.fill_between(x, 0, M/1000, alpha=0.3, color='#F18F01')
-    ax2.plot(x, M/1000, color='#F18F01', linewidth=2)
-    ax2.axhline(y=0, color='black', linewidth=1)
-    ax2.set_ylabel('Bending Moment (kN·m)', fontsize=11)
-    ax2.set_title('Bending Moment Diagram (BMD)', fontsize=12, fontweight='bold')
-    ax2.grid(True, linestyle='--', alpha=0.7)
-    
-    # Add max moment value
-    max_M = w * L**2 / 8
-    ax2.plot([L/2], [max_M/1000], 'ko', markersize=8)
-    ax2.annotate(f'$M_{{max}}$ = {max_M/1000:.2f} kN·m', xy=(L/2, max_M/1000), 
-                xytext=(L/2 + 0.15, max_M/1000 + 0.3),
-                fontsize=11, fontweight='bold', color='#F18F01')
+    # # Add values
+    # ax1.annotate(f'+{w*L/2/1000:.1f} kN', xy=(0, V[0]/1000), xytext=(0.1, V[0]/1000 + 1),
+    #             fontsize=10, fontweight='bold', color='#E63946')
+    # ax1.annotate(f'{V[-1]/1000:.1f} kN', xy=(L, V[-1]/1000), xytext=(L-0.3, V[-1]/1000 - 1.5),
+    #             fontsize=10, fontweight='bold', color='#E63946')
+    # ax1.plot([L/2], [0], 'ko', markersize=8)
+    # ax1.annotate('V = 0', xy=(L/2, 0), xytext=(L/2 + 0.1, 1), fontsize=10)
     
     # ==================== DEFLECTION DIAGRAM ====================
-    ax3 = axes[2]
-    ax3.fill_between(x, 0, -delta*1000, alpha=0.3, color='#2E86AB')
-    ax3.plot(x, -delta*1000, color='#2E86AB', linewidth=2)
-    ax3.axhline(y=0, color='black', linewidth=1)
-    ax3.set_xlabel('Position along beam (m)', fontsize=11)
-    ax3.set_ylabel('Deflection (mm)', fontsize=11)
-    ax3.set_title('Deflection Diagram', fontsize=12, fontweight='bold')
-    ax3.grid(True, linestyle='--', alpha=0.7)
+    ax2 = axes[0]#2
+    ax2.fill_between(x, 0, -delta*1000, alpha=0.3, color='#2E86AB')
+    ax2.plot(x, -delta*1000, color='#2E86AB', linewidth=2)
+    ax2.axhline(y=0, color='black', linewidth=1)
+    ax2.set_xlabel('Position along beam (m)', fontsize=11)
+    ax2.set_ylabel('Deflection (mm)', fontsize=11)
+    ax2.set_title('Deflection Diagram', fontsize=12, fontweight='bold')
+    ax2.grid(True, linestyle='--', alpha=0.7)
     
     # Add max deflection value
     max_delta = 5 * w * L**4 / (384 * E * I)
-    ax3.plot([L/2], [-max_delta*1000], 'ko', markersize=8)
-    ax3.annotate(f'$δ_{{max}}$ = {max_delta*1000:.4f} mm', xy=(L/2, -max_delta*1000), 
-                xytext=(L/2 + 0.15, -max_delta*1000 - 0.3),
+    ax2.plot([L/2], [-max_delta*1000], 'ko', markersize=8)
+    ax2.annotate(f'$δ_{{max}}$ = {max_delta*1000:.4f} mm', xy=(L/2, -max_delta*1000), 
+                xytext=(L/2 + 0.25, -max_delta*1000 ),#L/2 + 0.15, -max_delta*1000 - 0.3
                 fontsize=11, fontweight='bold', color='#2E86AB')
+
+    # ==================== BENDING MOMENT DIAGRAM ====================
+    ax1 = axes[1]#1
+    ax1.fill_between(x, 0, M/1000, alpha=0.3, color='#F18F01')
+    ax1.plot(x, M/1000, color='#F18F01', linewidth=2)
+    ax1.axhline(y=0, color='black', linewidth=1)
+    ax1.set_ylabel('Bending Moment (kN·m)', fontsize=11)
+    ax1.set_title('Bending Moment Diagram (BMD)', fontsize=12, fontweight='bold')
+    ax1.grid(True, linestyle='--', alpha=0.7)
+    
+    # Add max moment value
+    max_M = w * L**2 / 8
+    ax1.plot([L/2], [max_M/1000], 'ko', markersize=8)
+    ax1.annotate(f'$M_{{max}}$ = {max_M/1000:.2f} kN·m', xy=(L/2, max_M/1000), 
+                xytext=(L/2 + 0.25, max_M/1000 - 0.25),#L/2 + 0.15, max_M/1000 + 0.3
+                fontsize=11, fontweight='bold', color='#F18F01')
+    
     
     # Add formulas
     formula_text = (
@@ -468,11 +467,11 @@ def draw_complete_summary():
     
     plt.suptitle('Simply Supported Beam Analysis Summary', fontsize=16, fontweight='bold', y=0.98)
     
-    plt.savefig('test_files/beam_2D_test_udl.gid/plots/beam_complete_summary.png', dpi=200, bbox_inches='tight',
-                facecolor='white', edgecolor='none')
-    print("Saved: beam_complete_summary.png")
+    # plt.savefig('test_files/beam_2D_test_udl.gid/plots/beam_complete_summary.png', dpi=200, bbox_inches='tight',
+    #             facecolor='white', edgecolor='none')
+    # print("Saved: beam_complete_summary.png")
     
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":

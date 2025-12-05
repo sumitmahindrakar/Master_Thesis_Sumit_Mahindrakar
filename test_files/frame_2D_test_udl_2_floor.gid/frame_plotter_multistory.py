@@ -508,9 +508,9 @@ def plot_frame_geometry(vtk_data: VTKData, members: List[Member],
             
             # Offset label based on orientation
             if m.orientation == 'vertical':
-                offset = (-0.2, 0)
+                offset = (0.2, 0)
             elif m.orientation == 'horizontal':
-                offset = (0, 0.15)
+                offset = (0, -0.15)
             else:
                 offset = (0.1, 0.1)
             
@@ -520,14 +520,14 @@ def plot_frame_geometry(vtk_data: VTKData, members: List[Member],
     
     # Plot nodes
     for i, point in enumerate(vtk_data.points):
-        circle = Circle((point[0], point[1]), 0.08, facecolor='white', 
+        circle = Circle((point[0], point[1]), 0.02, facecolor='black', 
                         edgecolor='black', linewidth=2, zorder=5)
         ax.add_patch(circle)
         
-        if show_labels:
-            ax.annotate(f'{i + 1}', (point[0] + 0.15, point[1] + 0.15),
-                       fontsize=10, fontweight='bold',
-                       bbox=dict(boxstyle='circle,pad=0.2', facecolor='yellow', alpha=0.9))
+        # if show_labels:
+            # ax.annotate(f'{i + 1}', (point[0] + 0.15, point[1] + 0.15),
+            #            fontsize=10, fontweight='bold',
+            #            bbox=dict(boxstyle='circle,pad=0.2', facecolor='yellow', alpha=0.9))
     
     # Plot supports (at ground level)
     support_size = 0.12
@@ -561,7 +561,7 @@ def plot_frame_geometry(vtk_data: VTKData, members: List[Member],
         Line2D([0], [0], color=colors['beam'], linewidth=4, label='Beam'),
         Line2D([0], [0], color=colors['brace'], linewidth=2, linestyle='--', label='Brace'),
     ]
-    ax.legend(handles=legend_elements, loc='upper right')
+    ax.legend(handles=legend_elements, loc='best')
     
     return ax
 
@@ -845,7 +845,7 @@ def plot_frame_with_loads(vtk_data: VTKData, members: List[Member],
     # Add UDL arrows on beams
     for m in members:
         if m.member_type == 'beam':
-            n_arrows = 8
+            n_arrows = 12
             x_start, x_end = m.start_coords[0], m.end_coords[0]
             y = m.start_coords[1]
             
@@ -866,17 +866,17 @@ def plot_frame_with_loads(vtk_data: VTKData, members: List[Member],
                    color='#E63946', fontweight='bold')
     
     # Reactions
-    if 'REACTION' in vtk_data.point_data:
-        reactions = vtk_data.point_data['REACTION']
+    # if 'REACTION' in vtk_data.point_data:
+    #     reactions = vtk_data.point_data['REACTION']
         
-        for i, point in enumerate(vtk_data.points):
-            ry = reactions[i, 1]
-            if abs(ry) > 100:  # Significant reaction
-                ax.annotate('', xy=(point[0], point[1] - 0.1),
-                           xytext=(point[0], point[1] - 0.5),
-                           arrowprops=dict(arrowstyle='->', color='green', lw=2))
-                ax.text(point[0] + 0.15, point[1] - 0.4,
-                       f'Ry={ry/1000:.1f}kN', fontsize=9, color='green')
+    #     for i, point in enumerate(vtk_data.points):
+    #         ry = reactions[i, 1]
+    #         if abs(ry) > 100:  # Significant reaction
+    #             ax.annotate('', xy=(point[0], point[1] - 0.1),
+    #                        xytext=(point[0], point[1] - 0.5),
+    #                        arrowprops=dict(arrowstyle='->', color='green', lw=2))
+    #             ax.text(point[0] + 0.15, point[1] - 0.4,
+    #                    f'Ry={ry/1000:.1f}kN', fontsize=9, color='green')
     
     ax.set_title(f'{geometry.n_stories}-Story Frame with UDL Loading', 
                 fontsize=14, fontweight='bold')
@@ -1087,8 +1087,8 @@ def main():
     print("Generating plots...")
     
     fig1 = plot_frame_with_loads(vtk_data, members, geometry, params, OUTPUT_PREFIX)
-    fig2 = plot_frame_complete(vtk_data, members, geometry, OUTPUT_PREFIX)
-    fig3 = plot_analytical_comparison(vtk_data, members, geometry, params, OUTPUT_PREFIX)
+    # fig2 = plot_frame_complete(vtk_data, members, geometry, OUTPUT_PREFIX)
+    # fig3 = plot_analytical_comparison(vtk_data, members, geometry, params, OUTPUT_PREFIX)
     
     plt.show()
     
