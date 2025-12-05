@@ -39,6 +39,7 @@ class Member:
 class FrameParameters:
     """Frame properties for analytical solution"""
     L: float          # Beam span [m]
+    A: float          #crossArea m^2
     H: float          # Column height [m]
     w: float          # UDL on beam [N/m]
     P: float          # Point load [N]
@@ -560,6 +561,7 @@ def print_frame_results(vtk_data: VTKData, members: List[Member],
     print(f"\n{'FRAME PROPERTIES':^110}")
     print("-" * 110)
     print(f"  Span (L):               {params.L:.4f} m")
+    print(f"  Cross-Area (A):         {params.A:.4f} m")
     print(f"  Height (H):             {params.H:.4f} m")
     print(f"  UDL on beam (w):        {params.w/1000:.4f} kN/m")
     print(f"  Young's Modulus (E):    {params.E/1e9:.2f} GPa")
@@ -642,9 +644,10 @@ def print_frame_results(vtk_data: VTKData, members: List[Member],
 def plot_frame_system_diagram(params: FrameParameters, output_prefix: str = "frame"):
     """Plot frame system diagram with loads and dimensions"""
     
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=(13, 7))
     
     L = params.L
+    A = params.A
     H = params.H
     w = params.w
     
@@ -664,14 +667,14 @@ def plot_frame_system_diagram(params: FrameParameters, output_prefix: str = "fra
     node_labels = ['1', '2', '3', '4']
     
     for (x, y), label in zip(nodes, node_labels):
-        circle = Circle((x, y), 0.08, facecolor='white', edgecolor='black', linewidth=2, zorder=5)
+        circle = Circle((x, y), 0.02, facecolor='black', edgecolor='black', linewidth=2, zorder=5)
         ax.add_patch(circle)
-        ax.text(x - 0.25, y + 0.15, label, fontsize=12, fontweight='bold',
-               bbox=dict(boxstyle='circle', facecolor='yellow', alpha=0.9))
+        # ax.text(x - 0.25, y + 0.15, label, fontsize=12, fontweight='bold',
+        #        bbox=dict(boxstyle='circle', facecolor='yellow', alpha=0.9))
     
     # UDL on beam
     n_arrows = 12
-    arrow_y_start = H + 0.4
+    arrow_y_start = H + 0.3
     for i in range(n_arrows + 1):
         x = i * L / n_arrows
         ax.annotate('', xy=(x, H + 0.05), xytext=(x, arrow_y_start),
@@ -703,31 +706,38 @@ def plot_frame_system_diagram(params: FrameParameters, output_prefix: str = "fra
     dim_offset = -0.6
     
     # Span dimension
-    ax.annotate('', xy=(0, dim_offset), xytext=(L, dim_offset),
+    ax.annotate('', xy=(0, dim_offset+0.2), xytext=(L, dim_offset+0.2),
                arrowprops=dict(arrowstyle='<->', color='gray', lw=1.5))
-    ax.text(L/2, dim_offset - 0.15, f'L = {L:.1f} m', fontsize=11, ha='center', color='gray')
+    ax.text(L/2, dim_offset + 0.05, f'L = {L:.1f} m', fontsize=11, ha='center', color='gray')
+
+    ax.annotate('', xy=(0, -0.25), xytext=(0, -0.6),
+               arrowprops=dict(arrowstyle='-', color='gray', lw=1.5))
+    # ax.text(0.15, -0.4, f'Ry = {w*L/2/1000:.1f} kN', fontsize=10, color='green')
+    
+    ax.annotate('', xy=(L, -0.25), xytext=(L, -0.6),
+               arrowprops=dict(arrowstyle='-', color='gray', lw=1.5))
     
     # Height dimension
     ax.annotate('', xy=(-0.4, 0), xytext=(-0.4, H),
                arrowprops=dict(arrowstyle='<->', color='gray', lw=1.5))
-    ax.text(-0.6, H/2, f'H = {H:.1f} m', fontsize=11, ha='center', va='center', 
+    ax.text(-0.5, H/2, f'H = {H:.1f} m', fontsize=11, ha='center', va='center', 
            rotation=90, color='gray')
     
-    # Reactions
-    ax.annotate('', xy=(0, -0.15), xytext=(0, -0.5),
-               arrowprops=dict(arrowstyle='->', color='green', lw=2))
-    ax.text(0.15, -0.4, f'Ry = {w*L/2/1000:.1f} kN', fontsize=10, color='green')
+    # line
+    ax.annotate('', xy=(-0.1, 0), xytext=(-0.5, 0),
+               arrowprops=dict(arrowstyle='-', color='gray', lw=1.5))
+    # ax.text(0.15, -0.4, f'Ry = {w*L/2/1000:.1f} kN', fontsize=10, color='green')
     
-    ax.annotate('', xy=(L, -0.15), xytext=(L, -0.5),
-               arrowprops=dict(arrowstyle='->', color='green', lw=2))
-    ax.text(L-0.4, -0.4, f'Ry = {w*L/2/1000:.1f} kN', fontsize=10, color='green')
+    ax.annotate('', xy=(-0.1, H), xytext=(-0.5, H),
+               arrowprops=dict(arrowstyle='-', color='gray', lw=1.5))
+    # ax.text(L-0.4, -0.4, f'Ry = {w*L/2/1000:.1f} kN', fontsize=10, color='green')
     
     # Member labels
-    ax.text(-0.2, H/2, 'M1\n(Column)', fontsize=10, ha='center', va='center',
+    ax.text(0.25, H/2, 'M1\n(Column)', fontsize=10, ha='center', va='center',
            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
-    ax.text(L/2, H + 0.1, 'M2 (Beam)', fontsize=10, ha='center', va='bottom',
+    ax.text(L/2, H - 0.15, 'M2 (Beam)', fontsize=10, ha='center', va='bottom',
            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
-    ax.text(L + 0.2, H/2, 'M3\n(Column)', fontsize=10, ha='center', va='center',
+    ax.text(L - 0.25, H/2, 'M3\n(Column)', fontsize=10, ha='center', va='center',
            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
     
     # Properties box
@@ -736,6 +746,7 @@ def plot_frame_system_diagram(params: FrameParameters, output_prefix: str = "fra
                   f"E = {params.E/1e9:.0f} GPa\n"
                   f"I = {params.I_beam*1e6:.2f}×10⁻⁶ m⁴\n"
                   f"L = {L:.1f} m\n"
+                  f"A = {A:.1f} m\n"
                   f"H = {H:.1f} m\n"
                   f"w = {w/1000:.1f} kN/m")
     ax.text(L + 0.6, H, props_text, fontsize=10, va='top', fontfamily='monospace',
@@ -1218,6 +1229,7 @@ def main():
     # Frame parameters (modify according to your model)
     params = FrameParameters(
         L = 2.0,              # Beam span [m]
+        A = 0.00287,          # Beam cross-sectional area [m^2]
         H = 2.0,              # Column height [m]
         w = 10000.0,          # UDL on beam [N/m] = 10 kN/m
         P = 0.0,              # Point load [N]
@@ -1281,9 +1293,9 @@ def main():
     print("Generating plots...")
     
     fig1 = plot_frame_system_diagram(params, OUTPUT_PREFIX)
-    fig2 = plot_analytical_diagrams(params, errors, OUTPUT_PREFIX)
-    fig3 = plot_fem_vs_analytical(vtk_data, members, errors, params, OUTPUT_PREFIX)
-    fig4 = plot_error_distribution(vtk_data, errors, params, OUTPUT_PREFIX)
+    # fig2 = plot_analytical_diagrams(params, errors, OUTPUT_PREFIX)
+    # fig3 = plot_fem_vs_analytical(vtk_data, members, errors, params, OUTPUT_PREFIX)
+    # fig4 = plot_error_distribution(vtk_data, errors, params, OUTPUT_PREFIX)
     
     plt.show()
     

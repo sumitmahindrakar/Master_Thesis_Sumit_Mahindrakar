@@ -1,1 +1,2 @@
-test_files/frame_2D_test_udl.gid/frame_2D_test_udl.mdpa
+ (L, 0)]
+    node_labels = ['1', '2', '3', '4']
