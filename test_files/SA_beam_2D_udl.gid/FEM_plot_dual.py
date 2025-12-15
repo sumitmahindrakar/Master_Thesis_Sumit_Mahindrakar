@@ -25,7 +25,7 @@ import sys
 # USER INPUT - SET YOUR VTK FILE PATH HERE
 # =============================================================================
 
-VTK_FILE_PATH = "test_files/SA_beam_2D_udl.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"  # <-- Change this to current VTK file path
+VTK_FILE_PATH = "test_files/SA_beam_2D_udl.gid/vtk_output_dual/Parts_Beam_Beams_0_1.vtk"  # <-- Change this to current VTK file path
 
 # =============================================================================
 # CONFIGURATION - Easy to modify parameters
@@ -49,7 +49,7 @@ LINEWIDTH_DIAGRAM = 1.5
 # Figure settings
 FIGURE_DPI = 100
 SAVE_FIGURES = True          # Set to True to save figures as PNG
-OUTPUT_FOLDER = "test_files/SA_beam_2D_udl.gid/plots"     # Folder to save output figures
+OUTPUT_FOLDER = "test_files/SA_beam_2D_udl.gid/plots_dual"     # Folder to save output figures
 
 # =============================================================================
 # VTK FILE PARSER
