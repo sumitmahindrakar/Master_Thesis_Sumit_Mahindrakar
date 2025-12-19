@@ -552,82 +552,81 @@ def plot_moment_diagram(ax, points, cells, moment_data,
             ax.fill(polygon_x, polygon_y, color=fill_color, alpha=0.3)
 
 
+def find_support_indices(points):
+    """
+    Automatically find the left-most and right-most points for supports.
+    
+    Returns:
+    --------
+    tuple : (left_indices, right_indices)
+    """
+    x_coords = points[:, 0]
+    min_x = np.min(x_coords)
+    max_x = np.max(x_coords)
+    
+    # Find points at minimum and maximum x (with small tolerance)
+    tolerance = (max_x - min_x) * 0.01 if max_x > min_x else 0.01
+    
+    left_indices = np.where(np.abs(x_coords - min_x) < tolerance)[0].tolist()
+    right_indices = np.where(np.abs(x_coords - max_x) < tolerance)[0].tolist()
+    
+    return left_indices, right_indices
+
+
 def add_supports_l(ax, points, support_indices=None):
     """
-    Add support symbols at fixed nodes.
-    
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        Axes to plot on
-    points : numpy.ndarray
-        Array of point coordinates
-    support_indices : list
-        Indices of nodes with supports. If None, assumes bottom nodes are fixed.
+    Add left support symbols at fixed nodes.
     """
-    
     if support_indices is None:
-        # Auto-detect: assume nodes at minimum y are supports
-        min_y = np.min(points[:, 1])
-        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
+        support_indices, _ = find_support_indices(points)
     
-    # Triangle size for support symbol
+    # Ensure it's a list
+    if isinstance(support_indices, (int, np.integer)):
+        support_indices = [support_indices]
+    
     size = 0.15
     
     for idx in support_indices:
+        if idx >= len(points):
+            print(f"Warning: Support index {idx} out of range (max: {len(points)-1})")
+            continue
+            
         x, y = points[idx][0], points[idx][1]
-        
         
         # Draw vertical line
         ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
 
-
+        # Draw hatch lines
         for hy in np.linspace(y - size, y + size, 6):
-            ax.plot(
-                [x, x - size*0.3],
-                [hy, hy - size*0.3],
-                'k', lw=0.8
-            )
+            ax.plot([x, x - size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
 
 
-
-            
 def add_supports_r(ax, points, support_indices=None):
     """
-    Add support symbols at fixed nodes.
-    
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        Axes to plot on
-    points : numpy.ndarray
-        Array of point coordinates
-    support_indices : list
-        Indices of nodes with supports. If None, assumes bottom nodes are fixed.
+    Add right support symbols at fixed nodes.
     """
-    
     if support_indices is None:
-        # Auto-detect: assume nodes at minimum y are supports
-        min_y = np.min(points[:, 1])
-        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
+        _, support_indices = find_support_indices(points)
     
-    # Triangle size for support symbol
+    # Ensure it's a list
+    if isinstance(support_indices, (int, np.integer)):
+        support_indices = [support_indices]
+    
     size = 0.15
     
     for idx in support_indices:
+        if idx >= len(points):
+            print(f"Warning: Support index {idx} out of range (max: {len(points)-1})")
+            continue
+            
         x, y = points[idx][0], points[idx][1]
-        
         
         # Draw vertical line
         ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
 
-
+        # Draw hatch lines
         for hy in np.linspace(y - size, y + size, 6):
-            ax.plot(
-                [x, x + size*0.3],
-                [hy, hy - size*0.3],
-                'k', lw=0.8
-            )
+            ax.plot([x, x + size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
 
 
 # =============================================================================
