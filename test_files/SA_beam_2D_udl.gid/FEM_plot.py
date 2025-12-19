@@ -26,6 +26,7 @@ import sys
 # =============================================================================
 
 VTK_FILE_PATH = "test_files/SA_beam_2D_udl.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"  # <-- Change this to current VTK file path
+# VTK_FILE_PATH = "test_files/SA_beam_2D_udl.gid/vtk_output_dual/Parts_Beam_Beams_0_1.vtk"
 
 # =============================================================================
 # CONFIGURATION - Easy to modify parameters
@@ -50,6 +51,7 @@ LINEWIDTH_DIAGRAM = 1.5
 FIGURE_DPI = 100
 SAVE_FIGURES = True          # Set to True to save figures as PNG
 OUTPUT_FOLDER = "test_files/SA_beam_2D_udl.gid/plots"     # Folder to save output figures
+# OUTPUT_FOLDER = "test_files/SA_beam_2D_udl.gid/plots_dual"
 
 # =============================================================================
 # VTK FILE PARSER
@@ -552,82 +554,81 @@ def plot_moment_diagram(ax, points, cells, moment_data,
             ax.fill(polygon_x, polygon_y, color=fill_color, alpha=0.3)
 
 
+def find_support_indices(points):
+    """
+    Automatically find the left-most and right-most points for supports.
+    
+    Returns:
+    --------
+    tuple : (left_indices, right_indices)
+    """
+    x_coords = points[:, 0]
+    min_x = np.min(x_coords)
+    max_x = np.max(x_coords)
+    
+    # Find points at minimum and maximum x (with small tolerance)
+    tolerance = (max_x - min_x) * 0.01 if max_x > min_x else 0.01
+    
+    left_indices = np.where(np.abs(x_coords - min_x) < tolerance)[0].tolist()
+    right_indices = np.where(np.abs(x_coords - max_x) < tolerance)[0].tolist()
+    
+    return left_indices, right_indices
+
+
 def add_supports_l(ax, points, support_indices=None):
     """
-    Add support symbols at fixed nodes.
-    
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        Axes to plot on
-    points : numpy.ndarray
-        Array of point coordinates
-    support_indices : list
-        Indices of nodes with supports. If None, assumes bottom nodes are fixed.
+    Add left support symbols at fixed nodes.
     """
-    
     if support_indices is None:
-        # Auto-detect: assume nodes at minimum y are supports
-        min_y = np.min(points[:, 1])
-        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
+        support_indices, _ = find_support_indices(points)
     
-    # Triangle size for support symbol
+    # Ensure it's a list
+    if isinstance(support_indices, (int, np.integer)):
+        support_indices = [support_indices]
+    
     size = 0.15
     
     for idx in support_indices:
+        if idx >= len(points):
+            print(f"Warning: Support index {idx} out of range (max: {len(points)-1})")
+            continue
+            
         x, y = points[idx][0], points[idx][1]
-        
         
         # Draw vertical line
         ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
 
-
+        # Draw hatch lines
         for hy in np.linspace(y - size, y + size, 6):
-            ax.plot(
-                [x, x - size*0.3],
-                [hy, hy - size*0.3],
-                'k', lw=0.8
-            )
+            ax.plot([x, x - size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
 
 
-
-            
 def add_supports_r(ax, points, support_indices=None):
     """
-    Add support symbols at fixed nodes.
-    
-    Parameters:
-    -----------
-    ax : matplotlib.axes.Axes
-        Axes to plot on
-    points : numpy.ndarray
-        Array of point coordinates
-    support_indices : list
-        Indices of nodes with supports. If None, assumes bottom nodes are fixed.
+    Add right support symbols at fixed nodes.
     """
-    
     if support_indices is None:
-        # Auto-detect: assume nodes at minimum y are supports
-        min_y = np.min(points[:, 1])
-        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
+        _, support_indices = find_support_indices(points)
     
-    # Triangle size for support symbol
+    # Ensure it's a list
+    if isinstance(support_indices, (int, np.integer)):
+        support_indices = [support_indices]
+    
     size = 0.15
     
     for idx in support_indices:
+        if idx >= len(points):
+            print(f"Warning: Support index {idx} out of range (max: {len(points)-1})")
+            continue
+            
         x, y = points[idx][0], points[idx][1]
-        
         
         # Draw vertical line
         ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
 
-
+        # Draw hatch lines
         for hy in np.linspace(y - size, y + size, 6):
-            ax.plot(
-                [x, x + size*0.3],
-                [hy, hy - size*0.3],
-                'k', lw=0.8
-            )
+            ax.plot([x, x + size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
 
 
 # =============================================================================
@@ -638,20 +639,16 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
                        output_folder=OUTPUT_FOLDER):
     """
     Create all plots for the frame structure.
-    
-    Parameters:
-    -----------
-    vtk_data : dict
-        Parsed VTK data
-    save_figures : bool
-        Whether to save figures to files
-    output_folder : str
-        Folder to save output figures
     """
     
     # Extract data
     points = vtk_data['points']
     cells = vtk_data['cells']
+    
+    # Auto-detect support locations
+    left_supports, right_supports = find_support_indices(points)
+    print(f"  - Detected left supports at nodes: {left_supports}")
+    print(f"  - Detected right supports at nodes: {right_supports}")
     
     # Get field data with defaults
     displacement = vtk_data['point_data'].get('DISPLACEMENT', 
@@ -666,6 +663,12 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
         os.makedirs(output_folder)
         print(f"\nCreated output folder: {output_folder}")
     
+    # Calculate plot limits based on data
+    x_min, x_max = points[:, 0].min(), points[:, 0].max()
+    y_min, y_max = points[:, 1].min(), points[:, 1].max()
+    x_margin = (x_max - x_min) * 0.25 if x_max > x_min else 0.5
+    y_margin = max((y_max - y_min) * 0.5, 0.5)
+    
     # =========================================================================
     # PLOT 1: Combined view (Structure + Deflection + Moment)
     # =========================================================================
@@ -676,12 +679,12 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     ax1 = axes[0]
     ax1.set_title('Frame Structure', fontsize=14, fontweight='bold')
     plot_structure(ax1, points, cells, show_node_labels=True)
-    add_supports_l(ax1, points, support_indices=[0])
-    add_supports_r(ax1, points, support_indices=[3])
+    add_supports_l(ax1, points, support_indices=left_supports)
+    add_supports_r(ax1, points, support_indices=right_supports)
     ax1.set_xlabel('X (m)')
     ax1.set_ylabel('Y (m)')
-    ax1.set_xlim(-0.5, 2.5)#-1, 3.5
-    ax1.set_ylim(-0.5, 0.5)#0.0, 3.2
+    ax1.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax1.set_ylim(y_min - y_margin, y_max + y_margin)
     ax1.set_aspect('equal')
     ax1.grid(True, alpha=0.3)
     ax1.legend(loc='upper right')
@@ -694,18 +697,12 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
                   label='Structure')
     plot_deflection_diagram(ax2, points, cells, displacement, 
                            scale=DEFLECTION_SCALE, show_fill=True)
-    add_supports_l(ax2, points, support_indices=[0])
-    add_supports_r(ax2, points, support_indices=[3])
+    add_supports_l(ax2, points, support_indices=left_supports)
+    add_supports_r(ax2, points, support_indices=right_supports)
     ax2.set_xlabel('X (m)')
     ax2.set_ylabel('Y (m)')
-    y_min=np.min(displacement)
-    y_max=np.max(displacement)
-    ax2.set_xlim(-0.5, 2.5)#-1, 3.5
-    # ax2.set_ylim(y_max*1.1, y_min *1.1)#0.0, 3.2
-    # ax2.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
+    ax2.set_xlim(x_min - x_margin, x_max + x_margin)
     ax2.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    # ax2.set_ylim(y_min*DEFLECTION_SCALE, y_max*DEFLECTION_SCALE)#0.0, 3.2
-
     ax2.set_aspect('equal')
     ax2.grid(True, alpha=0.3)
     
@@ -724,17 +721,13 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     plot_moment_diagram(ax3, points, cells, cell_moment,
                        scale=MOMENT_SCALE, show_fill=True,
                        show_values=True, use_cell_data=True)
-    add_supports_l(ax3, points, support_indices=[0])
-    add_supports_r(ax3, points, support_indices=[3])
+    add_supports_l(ax3, points, support_indices=left_supports)
+    add_supports_r(ax3, points, support_indices=right_supports)
     ax3.set_xlabel('X (m)')
     ax3.set_ylabel('Y (m)')
-    y_min=np.min(cell_moment)
-    y_max=np.max(cell_moment)
-    # ax3.set_xlim(-0.5, 2.5)#-1, 3.5
+    ax3.set_xlim(x_min - x_margin, x_max + x_margin)
     ax3.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
-    # ax3.set_ylim(y_min - 0.5, y_max + 0.5)#0.0, 3.2
     ax3.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    # ax3.set_ylim((y_min/MOMENT_SCALE - 0.5)*MOMENT_SCALE, (y_max/MOMENT_SCALE + 0.5)*MOMENT_SCALE)
     ax3.set_aspect('equal')
     ax3.grid(True, alpha=0.3)
     
@@ -761,12 +754,11 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_deflection_diagram(ax, points, cells, displacement, 
                            scale=DEFLECTION_SCALE, show_fill=True)
-    add_supports_l(ax, points, support_indices=[0])
-    # print(points)
-    add_supports_r(ax, points, support_indices=[3])
+    add_supports_l(ax, points, support_indices=left_supports)
+    add_supports_r(ax, points, support_indices=right_supports)
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
+    ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
@@ -776,8 +768,6 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
            transform=ax.transAxes, fontsize=10, verticalalignment='top',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
-    ax.set_xlim(-0.5, 2.5)#-1, 3.5
-    # ax.set_ylim(-0.5, max_disp + 0.5)#0.0, 3.2
     ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
     
     if save_figures:
@@ -797,12 +787,11 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     plot_moment_diagram(ax, points, cells, cell_moment,
                        scale=MOMENT_SCALE, show_fill=True,
                        show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=[0])
-    add_supports_r(ax, points, support_indices=[3])
+    add_supports_l(ax, points, support_indices=left_supports)
+    add_supports_r(ax, points, support_indices=right_supports)
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_aspect('equal')
-    
     ax.grid(True, alpha=0.3)
     
     # Add info text
@@ -812,8 +801,7 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     ax.text(0.02, 0.3, f'Max moment: {max_moment_val:.1f}\nMin moment: {min_moment:.1f}\nScale factor: {MOMENT_SCALE}x',
            transform=ax.transAxes, fontsize=10, verticalalignment='top',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    ax.set_xlim(-0.5, 2.5)#-1, 3.5
-    # ax.set_ylim(-0.5, max_moment_val + 0.5)#0.0, 3.2
+    ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
     
     if save_figures:
