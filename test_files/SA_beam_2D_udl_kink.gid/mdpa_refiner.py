@@ -1,9 +1,10 @@
 """
 MDPA Mesh Refiner - Handles both 1-node and 2-node conditions
+Preserves node identity for coincident nodes
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 import re
 
 
@@ -37,44 +38,42 @@ def detect_condition_nodes(condition_type: str) -> int:
     match = re.search(r'(\d)N', condition_type)
     if match:
         return int(match.group(1))
-    return 2  # Default to 2 nodes
+    return 2
 
 
 def parse_mdpa(filename: str) -> MdpaData:
     """Parse an MDPA file and extract all data."""
-    
     with open(filename, 'r') as f:
         lines = f.readlines()
-    
+
     data = MdpaData()
     i = 0
-    
+
     while i < len(lines):
         line = lines[i].strip()
-        
-        # Skip empty lines
+
         if not line:
             i += 1
             continue
-        
+
         # ModelPartData
         if line.startswith("Begin ModelPartData"):
             while i < len(lines) and not lines[i].strip().startswith("End ModelPartData"):
                 data.model_part_data.append(lines[i])
                 i += 1
-            data.model_part_data.append(lines[i])  # Include End line
+            data.model_part_data.append(lines[i])
             i += 1
             continue
-        
+
         # Properties
         if line.startswith("Begin Properties"):
             while i < len(lines) and not lines[i].strip().startswith("End Properties"):
                 data.properties.append(lines[i])
                 i += 1
-            data.properties.append(lines[i])  # Include End line
+            data.properties.append(lines[i])
             i += 1
             continue
-        
+
         # Nodes
         if line.startswith("Begin Nodes"):
             i += 1
@@ -89,10 +88,9 @@ def parse_mdpa(filename: str) -> MdpaData:
                 i += 1
             i += 1
             continue
-        
+
         # Elements
         if line.startswith("Begin Elements"):
-            # Extract element type
             parts = line.split("Begin Elements")
             if len(parts) > 1:
                 data.element_type = parts[1].strip().split("//")[0].strip()
@@ -109,7 +107,7 @@ def parse_mdpa(filename: str) -> MdpaData:
                 i += 1
             i += 1
             continue
-        
+
         # ElementalData
         if line.startswith("Begin ElementalData"):
             data_name = line.split("Begin ElementalData")[1].strip().split("//")[0].strip()
@@ -127,10 +125,9 @@ def parse_mdpa(filename: str) -> MdpaData:
                 i += 1
             i += 1
             continue
-        
+
         # Conditions
         if line.startswith("Begin Conditions"):
-            # Extract condition type
             parts = line.split("Begin Conditions")
             if len(parts) > 1:
                 data.condition_type = parts[1].strip().split("//")[0].strip()
@@ -140,7 +137,6 @@ def parse_mdpa(filename: str) -> MdpaData:
                 cond_line = lines[i].strip()
                 if cond_line and not cond_line.startswith("//"):
                     parts = cond_line.split()
-                    # Condition format: id property_id node1 [node2] [node3]...
                     if len(parts) >= 2 + data.condition_num_nodes:
                         cond_id = int(parts[0])
                         prop_id = int(parts[1])
@@ -149,17 +145,16 @@ def parse_mdpa(filename: str) -> MdpaData:
                 i += 1
             i += 1
             continue
-        
+
         # SubModelPart
         if line.startswith("Begin SubModelPart"):
             smp_name = line.split("Begin SubModelPart")[1].strip().split("//")[0].strip()
             smp = SubModelPart(name=smp_name)
             i += 1
-            
+
             while i < len(lines) and not lines[i].strip().startswith("End SubModelPart"):
                 smp_line = lines[i].strip()
-                
-                # SubModelPartNodes
+
                 if smp_line.startswith("Begin SubModelPartNodes"):
                     i += 1
                     while i < len(lines) and not lines[i].strip().startswith("End SubModelPartNodes"):
@@ -169,8 +164,7 @@ def parse_mdpa(filename: str) -> MdpaData:
                         i += 1
                     i += 1
                     continue
-                
-                # SubModelPartElements
+
                 if smp_line.startswith("Begin SubModelPartElements"):
                     i += 1
                     while i < len(lines) and not lines[i].strip().startswith("End SubModelPartElements"):
@@ -180,8 +174,7 @@ def parse_mdpa(filename: str) -> MdpaData:
                         i += 1
                     i += 1
                     continue
-                
-                # SubModelPartConditions
+
                 if smp_line.startswith("Begin SubModelPartConditions"):
                     i += 1
                     while i < len(lines) and not lines[i].strip().startswith("End SubModelPartConditions"):
@@ -191,21 +184,36 @@ def parse_mdpa(filename: str) -> MdpaData:
                         i += 1
                     i += 1
                     continue
-                
+
                 i += 1
-            
+
             data.sub_model_parts[smp_name] = smp
             i += 1
             continue
-        
+
         i += 1
-    
+
     return data
 
 
 def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
-    """Refine mesh by subdividing elements."""
+    """
+    Refine mesh by subdividing elements.
+    Returns refined mesh with clean sequential numbering.
+    """
+    # Build ordered list of original nodes (preserving their order/identity)
+    original_node_ids = sorted(data.nodes.keys())
     
+    # Build ordered list of original elements
+    original_elem_ids = sorted(data.elements.keys())
+    
+    # Create mapping from old node ID to new node ID
+    # Original nodes keep relative order but get renumbered 1, 2, 3...
+    old_to_new_node: Dict[int, int] = {}
+    for new_id, old_id in enumerate(original_node_ids, start=1):
+        old_to_new_node[old_id] = new_id
+    
+    # Prepare refined data
     refined = MdpaData()
     refined.header_lines = data.header_lines.copy()
     refined.model_part_data = data.model_part_data.copy()
@@ -214,39 +222,69 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
     refined.condition_type = data.condition_type
     refined.condition_num_nodes = data.condition_num_nodes
     
-    # Copy original nodes
-    refined.nodes = dict(data.nodes)
+    # We'll build nodes in a specific order:
+    # For each element (in order), we add: first_node, intermediate_nodes..., (last_node handled by next element or at end)
+    # This ensures nodes along the mesh are sequential
     
-    # Track new nodes created for each element
-    element_new_nodes = {}  # elem_id -> list of new node ids
-    next_node_id = max(data.nodes.keys()) + 1
+    # First pass: determine node ordering based on element traversal
+    # We want nodes to be numbered in the order they appear along elements
     
-    # Create intermediate nodes for each element
-    for elem_id, elem in data.elements.items():
-        n1, n2 = elem['nodes']
-        p1 = data.nodes[n1]
-        p2 = data.nodes[n2]
+    # Track which original nodes we've seen and new intermediate nodes
+    node_order: List[Tuple[int, Tuple[float, float, float]]] = []  # (old_id or -1 for new, coords)
+    node_id_mapping: Dict[int, int] = {}  # old_node_id -> final_new_id
+    intermediate_nodes_per_elem: Dict[int, List[int]] = {}  # old_elem_id -> list of new node final IDs
+    
+    next_new_node_id = 1
+    seen_original_nodes = set()
+    
+    # Process elements in order to build node sequence
+    for old_elem_id in original_elem_ids:
+        elem = data.elements[old_elem_id]
+        n1_old, n2_old = elem['nodes']
         
-        new_nodes = []
+        # Add first node if not seen
+        if n1_old not in seen_original_nodes:
+            seen_original_nodes.add(n1_old)
+            node_id_mapping[n1_old] = next_new_node_id
+            refined.nodes[next_new_node_id] = data.nodes[n1_old]
+            next_new_node_id += 1
+        
+        # Add intermediate nodes
+        p1 = data.nodes[n1_old]
+        p2 = data.nodes[n2_old]
+        
+        new_intermediate_ids = []
         for j in range(1, subdivisions):
             t = j / subdivisions
             x = p1[0] + t * (p2[0] - p1[0])
             y = p1[1] + t * (p2[1] - p1[1])
             z = p1[2] + t * (p2[2] - p1[2])
-            refined.nodes[next_node_id] = (x, y, z)
-            new_nodes.append(next_node_id)
-            next_node_id += 1
+            refined.nodes[next_new_node_id] = (x, y, z)
+            new_intermediate_ids.append(next_new_node_id)
+            next_new_node_id += 1
         
-        element_new_nodes[elem_id] = new_nodes
+        intermediate_nodes_per_elem[old_elem_id] = new_intermediate_ids
+        
+        # Add second node if not seen
+        if n2_old not in seen_original_nodes:
+            seen_original_nodes.add(n2_old)
+            node_id_mapping[n2_old] = next_new_node_id
+            refined.nodes[next_new_node_id] = data.nodes[n2_old]
+            next_new_node_id += 1
     
-    # Create refined elements
+    # Now create refined elements
     next_elem_id = 1
-    old_to_new_elements = {}  # old_elem_id -> list of new_elem_ids
+    old_to_new_elements: Dict[int, List[int]] = {}
     
-    for elem_id, elem in data.elements.items():
-        n1, n2 = elem['nodes']
-        new_nodes = element_new_nodes[elem_id]
-        all_nodes = [n1] + new_nodes + [n2]
+    for old_elem_id in original_elem_ids:
+        elem = data.elements[old_elem_id]
+        n1_old, n2_old = elem['nodes']
+        
+        n1_new = node_id_mapping[n1_old]
+        n2_new = node_id_mapping[n2_old]
+        intermediate = intermediate_nodes_per_elem[old_elem_id]
+        
+        all_nodes = [n1_new] + intermediate + [n2_new]
         
         new_elem_ids = []
         for j in range(subdivisions):
@@ -257,7 +295,7 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
             new_elem_ids.append(next_elem_id)
             next_elem_id += 1
         
-        old_to_new_elements[elem_id] = new_elem_ids
+        old_to_new_elements[old_elem_id] = new_elem_ids
     
     # Handle elemental data
     for data_name, elem_data in data.elemental_data.items():
@@ -266,37 +304,48 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
             for new_elem_id in old_to_new_elements.get(old_elem_id, []):
                 refined.elemental_data[data_name][new_elem_id] = value
     
-    # Handle conditions based on type
+    # Handle conditions
     next_cond_id = 1
-    old_to_new_conditions = {}  # old_cond_id -> list of new_cond_ids
+    old_to_new_conditions: Dict[int, List[int]] = {}
     
-    for cond_id, cond in data.conditions.items():
+    # Sort conditions by their first node for consistent output
+    sorted_cond_ids = sorted(data.conditions.keys())
+    
+    for old_cond_id in sorted_cond_ids:
+        cond = data.conditions[old_cond_id]
+        
         if data.condition_num_nodes == 1:
-            # Point condition - don't subdivide, just copy
+            # Point condition - just remap the node
+            old_node = cond['nodes'][0]
+            new_node = node_id_mapping[old_node]
             refined.conditions[next_cond_id] = {
                 'property': cond['property'],
-                'nodes': cond['nodes'].copy()
+                'nodes': [new_node]
             }
-            old_to_new_conditions[cond_id] = [next_cond_id]
+            old_to_new_conditions[old_cond_id] = [next_cond_id]
             next_cond_id += 1
         else:
-            # Line condition - find which element it belongs to and subdivide
-            n1, n2 = cond['nodes']
+            # Line condition - find the element and subdivide
+            n1_old, n2_old = cond['nodes']
             
-            # Find the element with these nodes
             found_elem = None
-            for elem_id, elem in data.elements.items():
-                if set(elem['nodes']) == {n1, n2}:
-                    found_elem = elem_id
+            for old_elem_id in original_elem_ids:
+                elem = data.elements[old_elem_id]
+                if set(elem['nodes']) == {n1_old, n2_old}:
+                    found_elem = old_elem_id
                     break
             
             if found_elem is not None:
-                new_nodes = element_new_nodes[found_elem]
-                # Ensure correct ordering
-                if data.elements[found_elem]['nodes'][0] == n1:
-                    all_nodes = [n1] + new_nodes + [n2]
+                elem = data.elements[found_elem]
+                n1_new = node_id_mapping[n1_old]
+                n2_new = node_id_mapping[n2_old]
+                intermediate = intermediate_nodes_per_elem[found_elem]
+                
+                # Maintain correct direction
+                if elem['nodes'][0] == n1_old:
+                    all_nodes = [n1_new] + intermediate + [n2_new]
                 else:
-                    all_nodes = [n2] + new_nodes + [n1]
+                    all_nodes = [n2_new] + intermediate + [n1_new]
                 
                 new_cond_ids = []
                 for j in range(subdivisions):
@@ -307,27 +356,30 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
                     new_cond_ids.append(next_cond_id)
                     next_cond_id += 1
                 
-                old_to_new_conditions[cond_id] = new_cond_ids
+                old_to_new_conditions[old_cond_id] = new_cond_ids
             else:
-                # Element not found, just copy the condition
+                # Element not found, just remap nodes
+                new_nodes = [node_id_mapping[n] for n in cond['nodes']]
                 refined.conditions[next_cond_id] = {
                     'property': cond['property'],
-                    'nodes': cond['nodes'].copy()
+                    'nodes': new_nodes
                 }
-                old_to_new_conditions[cond_id] = [next_cond_id]
+                old_to_new_conditions[old_cond_id] = [next_cond_id]
                 next_cond_id += 1
     
     # Handle SubModelParts
     for smp_name, smp in data.sub_model_parts.items():
         new_smp = SubModelPart(name=smp_name)
         
-        # Add original nodes
-        new_smp.nodes = list(smp.nodes)
+        # Map original nodes
+        for old_node in smp.nodes:
+            if old_node in node_id_mapping:
+                new_smp.nodes.append(node_id_mapping[old_node])
         
-        # Add new intermediate nodes from elements in this SMP
+        # Add intermediate nodes from elements in this SMP
         for old_elem_id in smp.elements:
-            if old_elem_id in element_new_nodes:
-                new_smp.nodes.extend(element_new_nodes[old_elem_id])
+            if old_elem_id in intermediate_nodes_per_elem:
+                new_smp.nodes.extend(intermediate_nodes_per_elem[old_elem_id])
         
         # Remove duplicates and sort
         new_smp.nodes = sorted(set(new_smp.nodes))
@@ -336,11 +388,13 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
         for old_elem_id in smp.elements:
             if old_elem_id in old_to_new_elements:
                 new_smp.elements.extend(old_to_new_elements[old_elem_id])
+        new_smp.elements = sorted(new_smp.elements)
         
         # Map conditions
         for old_cond_id in smp.conditions:
             if old_cond_id in old_to_new_conditions:
                 new_smp.conditions.extend(old_to_new_conditions[old_cond_id])
+        new_smp.conditions = sorted(new_smp.conditions)
         
         refined.sub_model_parts[smp_name] = new_smp
     
@@ -349,7 +403,6 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
 
 def write_mdpa(data: MdpaData, filename: str):
     """Write MDPA data to file."""
-    
     with open(filename, 'w') as f:
         # ModelPartData
         if data.model_part_data:
@@ -359,7 +412,7 @@ def write_mdpa(data: MdpaData, filename: str):
             f.write("Begin ModelPartData\n")
             f.write("End ModelPartData\n")
         f.write("\n")
-        
+
         # Properties
         if data.properties:
             for line in data.properties:
@@ -368,14 +421,14 @@ def write_mdpa(data: MdpaData, filename: str):
             f.write("Begin Properties 1\n")
             f.write("End Properties\n")
         f.write("\n")
-        
+
         # Nodes
         f.write("Begin Nodes\n")
         for node_id in sorted(data.nodes.keys()):
             x, y, z = data.nodes[node_id]
             f.write(f"    {node_id}   {x:.10f}   {y:.10f}   {z:.10f}\n")
         f.write("End Nodes\n\n")
-        
+
         # Elements
         f.write(f"Begin Elements {data.element_type}\n")
         for elem_id in sorted(data.elements.keys()):
@@ -383,15 +436,15 @@ def write_mdpa(data: MdpaData, filename: str):
             nodes_str = "   ".join(str(n) for n in elem['nodes'])
             f.write(f"    {elem_id}   {elem['property']}   {nodes_str}\n")
         f.write("End Elements\n\n")
-        
+
         # ElementalData
         for data_name, elem_data in data.elemental_data.items():
             f.write(f"Begin ElementalData {data_name}\n")
             for elem_id in sorted(elem_data.keys()):
                 f.write(f"    {elem_id} {elem_data[elem_id]}\n")
             f.write("End ElementalData\n\n")
-        
-        # Conditions (only if there are conditions)
+
+        # Conditions
         if data.conditions:
             f.write(f"Begin Conditions {data.condition_type}\n")
             for cond_id in sorted(data.conditions.keys()):
@@ -399,32 +452,59 @@ def write_mdpa(data: MdpaData, filename: str):
                 nodes_str = " ".join(str(n) for n in cond['nodes'])
                 f.write(f"    {cond_id} {cond['property']} {nodes_str}\n")
             f.write("End Conditions\n\n")
-        
+
         # SubModelParts
         for smp_name, smp in data.sub_model_parts.items():
             f.write(f"Begin SubModelPart {smp_name}\n")
-            
-            # Nodes
+
             if smp.nodes:
                 f.write("    Begin SubModelPartNodes\n")
                 for node_id in sorted(smp.nodes):
                     f.write(f"        {node_id}\n")
                 f.write("    End SubModelPartNodes\n")
-            
-            # Elements
+
             if smp.elements:
                 f.write("    Begin SubModelPartElements\n")
                 for elem_id in sorted(smp.elements):
                     f.write(f"        {elem_id}\n")
                 f.write("    End SubModelPartElements\n")
-            
-            # Conditions - THIS IS THE KEY FIX
+
             if smp.conditions:
                 f.write("    Begin SubModelPartConditions\n")
                 for cond_id in sorted(smp.conditions):
                     f.write(f"        {cond_id}\n")
                 f.write("    End SubModelPartConditions\n")
-            
+
             f.write("End SubModelPart\n\n")
-    
+
     print(f"Written: {filename}")
+
+
+def refine_mdpa(input_file: str, output_file: str, subdivisions: int = 2):
+    """Main function to refine an MDPA mesh file."""
+    print(f"Reading: {input_file}")
+    data = parse_mdpa(input_file)
+
+    print(f"Original mesh: {len(data.nodes)} nodes, {len(data.elements)} elements, {len(data.conditions)} conditions")
+
+    print(f"Refining with {subdivisions} subdivisions...")
+    refined = refine_mesh(data, subdivisions)
+
+    print(f"Refined mesh: {len(refined.nodes)} nodes, {len(refined.elements)} elements, {len(refined.conditions)} conditions")
+
+    write_mdpa(refined, output_file)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 3:
+        print("Usage: python mdpa_refiner.py <input.mdpa> <output.mdpa> [subdivisions]")
+        print("  subdivisions: number of subdivisions per element (default: 2)")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    subdivisions = int(sys.argv[3]) if len(sys.argv) > 3 else 2
+
+    refine_mdpa(input_file, output_file, subdivisions)
