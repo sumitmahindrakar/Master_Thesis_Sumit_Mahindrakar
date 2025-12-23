@@ -25,9 +25,9 @@ FOLDER = os.path.dirname(os.path.abspath(__file__))
 # =============================================================================
 
 # Scale factors for visualization
-PRIMARY_MOMENT_SCALE = 0.0003
+PRIMARY_MOMENT_SCALE = 0.0001
 DUAL_MOMENT_SCALE = 0.000001
-SENSITIVITY_SCALE = 1e4
+SENSITIVITY_SCALE = 1e3*5
 
 # Colors
 COLOR_STRUCTURE = 'black'
@@ -45,7 +45,8 @@ LINEWIDTH_DIAGRAM = 1.5
 # Figure settings
 FIGURE_DPI = 100
 SAVE_FIGURES = True
-OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"
+
+OUTPUT_FOLDER = os.path.join(FOLDER, "SA_plots")  
 
 
 # =============================================================================
@@ -494,42 +495,47 @@ def plot_structure(ax, points, cells, color=COLOR_STRUCTURE,
                        fontsize=8, color='gray')
 
 
-def add_supports_l(ax, points, support_indices=None):
-    """Add left support symbols."""
+def add_supports(ax, points, support_indices=None):
+    """
+    Add support symbols at fixed nodes.
+    
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    points : numpy.ndarray
+        Array of point coordinates
+    support_indices : list
+        Indices of nodes with supports. If None, assumes bottom nodes are fixed.
+    """
+    
     if support_indices is None:
-        support_indices, _ = find_support_indices(points)
+        # Auto-detect: assume nodes at minimum y are supports
+        min_y = np.min(points[:, 1])
+        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
     
-    if isinstance(support_indices, (int, np.integer)):
-        support_indices = [support_indices]
-    
-    size = 0.08
+    # Triangle size for support symbol
+    size = 0.15
     
     for idx in support_indices:
-        if idx >= len(points):
-            continue
         x, y = points[idx][0], points[idx][1]
-        ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
-        for hy in np.linspace(y - size, y + size, 6):
-            ax.plot([x, x - size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
-
-
-def add_supports_r(ax, points, support_indices=None):
-    """Add right support symbols."""
-    if support_indices is None:
-        _, support_indices = find_support_indices(points)
-    
-    if isinstance(support_indices, (int, np.integer)):
-        support_indices = [support_indices]
-    
-    size = 0.08
-    
-    for idx in support_indices:
-        if idx >= len(points):
-            continue
-        x, y = points[idx][0], points[idx][1]
-        ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
-        for hy in np.linspace(y - size, y + size, 6):
-            ax.plot([x, x + size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
+        
+        # Draw fixed support (triangle)
+        triangle = plt.Polygon([
+            [x, y],
+            [x - size, y - size],
+            [x + size, y - size]
+        ], fill=False, edgecolor='black', linewidth=1.5)
+        ax.add_patch(triangle)
+        
+        # Draw ground line
+        ax.plot([x - size*1.2, x + size*1.2], [y - size, y - size], 
+               'k-', linewidth=1.5)
+        
+        # Draw hatching lines
+        for hx in np.linspace(x - size, x + size, 4):
+            ax.plot([hx, hx - size*0.3], [y - size, y - size*1.3], 
+                   'k-', linewidth=0.8)
 
 
 def plot_moment_diagram_on_structure(ax, points, cells, moment_data, 
@@ -768,8 +774,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      color=COLOR_PRIMARY_MOMENT,
                                      fill_color=COLOR_FILL_PRIMARY,
                                      show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+    add_supports(ax, points)
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
@@ -783,9 +788,10 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'Scale: {PRIMARY_MOMENT_SCALE}\n'
                 f'─────────────\n'
                 f'Elements: {geometry_info["n_elements"]}\n'
-                f'Length: {geometry_info["total_length"]:.3f} m')
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10,
-           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                # f'Length: {geometry_info["total_length"]:.3f} m'
+                )
+    ax.text(0.5, 0.25, info_text, transform=ax.transAxes, fontsize=10,
+           horizontalalignment='center',verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'primary_moment_diagram.png')
@@ -797,7 +803,9 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     # =========================================================================
     # PLOT 2: Dual Moment Diagram
     # =========================================================================
-    
+    max_M_dual = np.max(cell_moment_dual[:, 2])
+    min_M_dual = np.min(cell_moment_dual[:, 2])
+
     fig2, ax = plt.subplots(figsize=(14, 6), dpi=FIGURE_DPI)
     ax.set_title('Dual/Adjoint Bending Moment Diagram M̄(x)\n[From Unit Virtual Load at Response Location]', 
                  fontsize=14, fontweight='bold')
@@ -808,19 +816,20 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      color=COLOR_DUAL_MOMENT,
                                      fill_color=COLOR_FILL_DUAL,
                                      show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+    add_supports(ax, points)
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax.set_xlim(x_min - x_margin, x_max + x_margin+max_M_dual*DUAL_MOMENT_SCALE)
+    ax.set_xlim(x_min - x_margin-max_M_dual*DUAL_MOMENT_SCALE, x_max + x_margin+max_M_dual*DUAL_MOMENT_SCALE)
+    # ax.set_ylim(y_min - y_margin-max_M_dual*DUAL_MOMENT_SCALE, y_max + y_margin+max_M_dual*DUAL_MOMENT_SCALE)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
-    max_M_dual = np.max(cell_moment_dual[:, 2])
-    min_M_dual = np.min(cell_moment_dual[:, 2])
-    info_text = f'Max M̄: {max_M_dual:.1f} N·m\nMin M̄: {min_M_dual:.1f} N·m\nScale: {DUAL_MOMENT_SCALE}'
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10,
-           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    # max_M_dual = np.max(cell_moment_dual[:, 2])
+    # min_M_dual = np.min(cell_moment_dual[:, 2])
+    info_text = f'Max M̄: {max_M_dual:.1f} N·m\nMin M̄: {min_M_dual:.1f} N·m\nScale: {DUAL_MOMENT_SCALE}\n'f'─────────────────\n'f'Elements: {geometry_info["n_elements"]}\n'
+    ax.text(0.5, 0.25, info_text, transform=ax.transAxes, fontsize=10,
+           horizontalalignment='center',verticalalignment='center', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'dual_moment_diagram.png')
@@ -841,11 +850,10 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivities,
                                           scale=SENSITIVITY_SCALE,
                                           show_values=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+    add_supports(ax, points)
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax.set_xlim(x_min - x_margin, x_max + x_margin+2)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
@@ -854,7 +862,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                label='Positive: ↑EI → ↑M')
     neg_patch = mpatches.Patch(color=COLOR_FILL_SENSITIVITY_NEG, alpha=0.4, 
                                label='Negative: ↑EI → ↓M')
-    ax.legend(handles=[pos_patch, neg_patch], loc='upper right', fontsize=10)
+    ax.legend(handles=[pos_patch, neg_patch], loc='best', fontsize=10)
     
     # Info box with TOTAL SENSITIVITY prominently displayed
     max_sens = max(s['dM_dEI'] for s in sensitivities.values())
@@ -864,7 +872,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'EI = {EI:.2e} N·m²\n'
                 f'─────────────────\n'
                 f'Elements: {geometry_info["n_elements"]}\n'
-                f'Length: {geometry_info["total_length"]:.3f} m\n'
+                # f'Length: {geometry_info["total_length"]:.3f} m\n'
                 f'Scale: {SENSITIVITY_SCALE:.0e}\n'
                 f'─────────────────\n'
                 f'Max: {max_sens:.4e}\n'
@@ -873,16 +881,16 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'TOTAL ∂M/∂(EI):\n'
                 f'{total_sensitivity:.4e}')
     
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=9,
-           verticalalignment='top', family='monospace',
+    ax.text(0.75, 0.5, info_text, transform=ax.transAxes, fontsize=9,
+           horizontalalignment='center',verticalalignment='center', family='monospace',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.9, edgecolor='black'))
     
     # Prominent total sensitivity annotation at bottom center
-    ax.text(0.5, 0.02, f'Σ ∂M/∂(EI) = {total_sensitivity:.6e}', 
-           transform=ax.transAxes, fontsize=12, fontweight='bold',
-           ha='center', va='bottom',
-           bbox=dict(boxstyle='round,pad=0.5', facecolor='#FFD700', alpha=0.9, 
-                    edgecolor='black', linewidth=2))
+    # ax.text(0.5, 0.02, f'Σ ∂M/∂(EI) = {total_sensitivity:.6e}', 
+    #        transform=ax.transAxes, fontsize=12, fontweight='bold',
+    #        ha='center', va='bottom',
+    #        bbox=dict(boxstyle='round,pad=0.5', facecolor='#FFD700', alpha=0.9, 
+    #                 edgecolor='black', linewidth=2))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'sensitivity_diagram.png')
@@ -892,75 +900,73 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     plt.show()
     
     # =========================================================================
-    # PLOT 4: All Three Diagrams Stacked Vertically
+    # PLOT 4: All Three Diagrams Side by Side (Horizontal)
     # =========================================================================
-    
-    fig4, axes = plt.subplots(3, 1, figsize=(14, 14), dpi=FIGURE_DPI)
+
+    fig4, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=FIGURE_DPI)  # Changed to 1 row, 3 columns
     fig4.suptitle('Sensitivity Analysis: Complete Diagram Set', fontsize=14, fontweight='bold')
-    
+
     # Primary Moment
     ax = axes[0]
     ax.set_title('Primary Moment M(x)', fontsize=12, fontweight='bold')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_moment_diagram_on_structure(ax, points, cells, cell_moment_primary,
-                                     scale=PRIMARY_MOMENT_SCALE,
-                                     color=COLOR_PRIMARY_MOMENT,
-                                     fill_color=COLOR_FILL_PRIMARY,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                    scale=PRIMARY_MOMENT_SCALE,
+                                    color=COLOR_PRIMARY_MOMENT,
+                                    fill_color=COLOR_FILL_PRIMARY,
+                                    show_values=True, use_cell_data=True)
+    add_supports(ax, points)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
+
     # Dual Moment
     ax = axes[1]
     ax.set_title('Dual Moment M̄(x)', fontsize=12, fontweight='bold')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_moment_diagram_on_structure(ax, points, cells, cell_moment_dual,
-                                     scale=DUAL_MOMENT_SCALE,
-                                     color=COLOR_DUAL_MOMENT,
-                                     fill_color=COLOR_FILL_DUAL,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                    scale=DUAL_MOMENT_SCALE,
+                                    color=COLOR_DUAL_MOMENT,
+                                    fill_color=COLOR_FILL_DUAL,
+                                    show_values=True, use_cell_data=True)
+    add_supports(ax, points)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
+
     # Sensitivity
     ax = axes[2]
     ax.set_title(f'Sensitivity ∂M/∂(EI)  |  TOTAL = {total_sensitivity:.4e}', 
                 fontsize=12, fontweight='bold', color='#8B0000')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivities,
-                                          scale=SENSITIVITY_SCALE,
-                                          show_values=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                        scale=SENSITIVITY_SCALE,
+                                        show_values=True)
+    add_supports(ax, points)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
+
     # Add total in corner
-    ax.text(0.98, 0.02, f'Σ = {total_sensitivity:.4e}', 
-           transform=ax.transAxes, fontsize=11, fontweight='bold',
-           ha='right', va='bottom',
-           bbox=dict(boxstyle='round', facecolor='#FFD700', alpha=0.9))
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    
+    ax.text(0.5, 0.02, f'Σ = {total_sensitivity:.4e}', 
+        transform=ax.transAxes, fontsize=11, fontweight='bold',
+        ha='center', va='bottom',
+        bbox=dict(boxstyle='round', facecolor='#FFD700', alpha=0.9))
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
     if save_figures:
-        filepath = os.path.join(output_folder, 'sensitivity_stacked.png')
+        filepath = os.path.join(output_folder, 'sensitivity_horizontal.png')
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         print(f"Saved: {filepath}")
-    
-    plt.show()
 
+    plt.show()
 
 # =============================================================================
 # MAIN FUNCTION
@@ -1120,11 +1126,11 @@ if __name__ == "__main__":
     # =========================================================================
     
     # VTK file paths (required)
-    PRIMARY_VTK = "test_files/SA_beam_2D_udl_kink.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"
-    DUAL_VTK = "test_files/SA_beam_2D_udl_kink.gid/vtk_output_dual/Parts_Beam_Beams_0_1.vtk"
+    PRIMARY_VTK = os.path.join(FOLDER, "vtk_output/Parts_Beam_Beams_0_1.vtk")  
+    DUAL_VTK = os.path.join(FOLDER, "vtk_output_dual/Parts_Beam_Beams_0_1.vtk")
     
     # Material JSON path (optional - will auto-search if None)
-    MATERIAL_JSON = "test_files/SA_beam_2D_udl_kink.gid/StructuralMaterials.json"
+    MATERIAL_JSON = os.path.join(FOLDER, "StructuralMaterials.json")
     # MATERIAL_JSON = None  # Uncomment to auto-search
     
     # Optional manual overrides (set to None to use JSON values)
