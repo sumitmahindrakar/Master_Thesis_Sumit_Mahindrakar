@@ -9,6 +9,10 @@ Description:
     
 Formula:
     ∂M_response/∂(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
+    
+Features:
+    - Shows only max/min values per member type (columns vs beams)
+    - Circles repeated/duplicate nodes on dual and sensitivity plots
 """
 
 import numpy as np
@@ -17,6 +21,7 @@ import sys
 import json
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.patches import Circle
 
 FOLDER = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,9 +30,9 @@ FOLDER = os.path.dirname(os.path.abspath(__file__))
 # =============================================================================
 
 # Scale factors for visualization
-PRIMARY_MOMENT_SCALE = 0.0003
+PRIMARY_MOMENT_SCALE = 0.0001
 DUAL_MOMENT_SCALE = 0.000001
-SENSITIVITY_SCALE = 1e4
+SENSITIVITY_SCALE = 1e3 * 5
 
 # Colors
 COLOR_STRUCTURE = 'black'
@@ -37,6 +42,7 @@ COLOR_FILL_PRIMARY = 'lightblue'
 COLOR_FILL_DUAL = 'lightgreen'
 COLOR_FILL_SENSITIVITY_POS = '#90EE90'
 COLOR_FILL_SENSITIVITY_NEG = '#FFB6C1'
+COLOR_REPEATED_NODE = 'red'  # Color for repeated node circles
 
 # Line widths
 LINEWIDTH_STRUCTURE = 2.0
@@ -45,7 +51,12 @@ LINEWIDTH_DIAGRAM = 1.5
 # Figure settings
 FIGURE_DPI = 100
 SAVE_FIGURES = True
-OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"
+
+# Repeated node circle settings
+REPEATED_NODE_CIRCLE_RADIUS = 0.12
+REPEATED_NODE_CIRCLE_LINEWIDTH = 2.5
+
+OUTPUT_FOLDER = os.path.join(FOLDER, "SA_plots")
 
 
 # =============================================================================
@@ -53,20 +64,7 @@ OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"
 # =============================================================================
 
 def load_material_properties(json_path, model_part_name=None):
-    """
-    Load material properties (E, I) from StructuralMaterials.json
-    
-    Parameters:
-    -----------
-    json_path : str
-        Path to StructuralMaterials.json file
-    model_part_name : str, optional
-        Specific model part name to extract. If None, uses first property.
-        
-    Returns:
-    --------
-    dict : Dictionary with E, I, and other material properties
-    """
+    """Load material properties (E, I) from StructuralMaterials.json"""
     
     if not os.path.exists(json_path):
         raise FileNotFoundError(f"Material JSON file not found: {json_path}")
@@ -81,7 +79,6 @@ def load_material_properties(json_path, model_part_name=None):
     if not properties_list:
         raise ValueError("No properties found in JSON file")
     
-    # Find the right property set
     selected_prop = None
     
     if model_part_name:
@@ -95,16 +92,13 @@ def load_material_properties(json_path, model_part_name=None):
     else:
         selected_prop = properties_list[0]
     
-    # Extract material variables
     material = selected_prop.get('Material', {})
     variables = material.get('Variables', {})
     
-    # Get E and I (I33 for bending about z-axis typically)
     E = variables.get('YOUNG_MODULUS', None)
     I33 = variables.get('I33', None)
     I22 = variables.get('I22', None)
     
-    # Use I33 by default, fallback to I22
     I = I33 if I33 is not None else I22
     
     if E is None:
@@ -134,30 +128,16 @@ def load_material_properties(json_path, model_part_name=None):
 
 
 def find_material_json(vtk_path):
-    """
-    Try to find StructuralMaterials.json in the same directory or parent directories.
+    """Try to find StructuralMaterials.json in the same directory or parent directories."""
     
-    Parameters:
-    -----------
-    vtk_path : str
-        Path to VTK file
-        
-    Returns:
-    --------
-    str : Path to StructuralMaterials.json or None if not found
-    """
-    
-    # Get directory of VTK file
     vtk_dir = os.path.dirname(os.path.abspath(vtk_path))
     
-    # Common locations to search
     search_paths = [
         os.path.join(vtk_dir, 'StructuralMaterials.json'),
         os.path.join(vtk_dir, '..', 'StructuralMaterials.json'),
         os.path.join(vtk_dir, '..', '..', 'StructuralMaterials.json'),
     ]
     
-    # Also check parent directories up to 3 levels
     current_dir = vtk_dir
     for _ in range(4):
         check_path = os.path.join(current_dir, 'StructuralMaterials.json')
@@ -354,6 +334,115 @@ def parse_vtk_cell_moments(vtk_file_path):
 
 
 # =============================================================================
+# REPEATED NODE DETECTION
+# =============================================================================
+
+def find_repeated_nodes(points, tolerance=1e-6):
+    """
+    Find nodes that have the same coordinates (repeated/duplicate nodes).
+    
+    Parameters:
+    -----------
+    points : numpy.ndarray
+        Array of point coordinates (N x 3)
+    tolerance : float
+        Distance tolerance to consider nodes as duplicates
+        
+    Returns:
+    --------
+    dict : {
+        'repeated_positions': list of (x, y, z) tuples for unique repeated positions,
+        'node_groups': list of lists, each containing node indices at same position,
+        'all_repeated_indices': set of all node indices that are repeated
+    }
+    """
+    
+    n_points = len(points)
+    
+    # Dictionary to group nodes by position
+    position_to_nodes = {}
+    
+    for i, point in enumerate(points):
+        # Round to tolerance for grouping
+        key = tuple(np.round(point / tolerance) * tolerance)
+        
+        if key not in position_to_nodes:
+            position_to_nodes[key] = []
+        position_to_nodes[key].append(i)
+    
+    # Find positions with more than one node
+    repeated_positions = []
+    node_groups = []
+    all_repeated_indices = set()
+    
+    for pos, indices in position_to_nodes.items():
+        if len(indices) > 1:
+            repeated_positions.append(pos)
+            node_groups.append(indices)
+            all_repeated_indices.update(indices)
+    
+    result = {
+        'repeated_positions': repeated_positions,
+        'node_groups': node_groups,
+        'all_repeated_indices': all_repeated_indices
+    }
+    
+    if repeated_positions:
+        print(f"\n  Found {len(repeated_positions)} repeated node location(s):")
+        for i, (pos, group) in enumerate(zip(repeated_positions, node_groups)):
+            print(f"    Position {i+1}: ({pos[0]:.4f}, {pos[1]:.4f}, {pos[2]:.4f})")
+            print(f"      Node indices: {group}")
+    else:
+        print("\n  No repeated nodes found.")
+    
+    return result
+
+
+def add_repeated_node_circles(ax, repeated_node_info, 
+                               radius=REPEATED_NODE_CIRCLE_RADIUS,
+                               color=COLOR_REPEATED_NODE,
+                               linewidth=REPEATED_NODE_CIRCLE_LINEWIDTH,
+                               label='Response Location'):
+    """
+    Add circles around repeated node positions on the plot.
+    
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    repeated_node_info : dict
+        Output from find_repeated_nodes()
+    radius : float
+        Radius of the circles
+    color : str
+        Color of the circles
+    linewidth : float
+        Line width of the circles
+    label : str
+        Label for legend
+    """
+    
+    positions = repeated_node_info['repeated_positions']
+    
+    for i, pos in enumerate(positions):
+        x, y = pos[0], pos[1]
+        
+        circle = Circle((x, y), radius, 
+                        fill=False, 
+                        edgecolor=color, 
+                        linewidth=linewidth,
+                        linestyle='-',
+                        zorder=10)
+        ax.add_patch(circle)
+        
+        # Add label only for first circle (for legend)
+        if i == 0 and label:
+            # Create a dummy line for legend
+            ax.plot([], [], color=color, linewidth=linewidth, 
+                   label=label, linestyle='-')
+
+
+# =============================================================================
 # GEOMETRY UTILITIES
 # =============================================================================
 
@@ -393,26 +482,13 @@ def find_support_indices(points):
 
 
 def calculate_geometry_from_vtk(vtk_data):
-    """
-    Calculate beam geometry (total length, number of elements, element lengths)
-    from VTK data.
-    
-    Parameters:
-    -----------
-    vtk_data : dict
-        Parsed VTK data
-        
-    Returns:
-    --------
-    dict : Dictionary with geometry information
-    """
+    """Calculate beam geometry from VTK data."""
     
     points = vtk_data['points']
     cells = vtk_data['cells']
     
     n_elements = len(cells)
     
-    # Calculate individual element lengths
     element_lengths = {}
     total_length = 0.0
     
@@ -424,11 +500,9 @@ def calculate_geometry_from_vtk(vtk_data):
         element_lengths[elem_id] = length
         total_length += length
     
-    # Calculate beam span (distance from first to last point in x-direction)
     x_coords = points[:, 0]
     beam_span = np.max(x_coords) - np.min(x_coords)
     
-    # Get bounding box
     x_min, x_max = np.min(x_coords), np.max(x_coords)
     y_min, y_max = np.min(points[:, 1]), np.max(points[:, 1])
     z_min, z_max = np.min(points[:, 2]), np.max(points[:, 2])
@@ -455,6 +529,139 @@ def calculate_geometry_from_vtk(vtk_data):
     print(f"  Average element length: {result['avg_element_length']:.6f} m")
     
     return result
+
+
+# =============================================================================
+# MEMBER CLASSIFICATION AND FILTERING
+# =============================================================================
+
+def classify_members(points, cells, angle_threshold=45.0):
+    """
+    Classify elements as 'column' (vertical) or 'beam' (horizontal).
+    """
+    
+    classifications = {}
+    
+    for idx, cell in enumerate(cells):
+        elem_id = idx + 1
+        p1 = points[cell[0]]
+        p2 = points[cell[1]]
+        
+        dx = abs(p2[0] - p1[0])
+        dy = abs(p2[1] - p1[1])
+        
+        if dy < 1e-10:
+            angle_from_vertical = 90.0
+        elif dx < 1e-10:
+            angle_from_vertical = 0.0
+        else:
+            angle_from_vertical = np.degrees(np.arctan(dx / dy))
+        
+        if angle_from_vertical < angle_threshold:
+            classifications[elem_id] = 'column'
+        else:
+            classifications[elem_id] = 'beam'
+    
+    return classifications
+
+
+def get_extreme_element_ids(moment_data, classifications, use_cell_data=True):
+    """
+    Get element IDs that have max/min moments for each member type.
+    """
+    
+    column_values = {}
+    beam_values = {}
+    
+    for elem_id, member_type in classifications.items():
+        idx = elem_id - 1
+        
+        if use_cell_data and hasattr(moment_data, '__len__'):
+            if idx < len(moment_data):
+                if hasattr(moment_data[idx], '__len__'):
+                    moment_val = moment_data[idx][2]
+                else:
+                    moment_val = moment_data[idx]
+            else:
+                continue
+        elif isinstance(moment_data, dict):
+            if elem_id in moment_data:
+                moment_val = moment_data[elem_id]
+            else:
+                continue
+        else:
+            continue
+        
+        if member_type == 'column':
+            column_values[elem_id] = moment_val
+        else:
+            beam_values[elem_id] = moment_val
+    
+    show_elements = set()
+    tolerance = 1e-6
+    
+    if column_values:
+        max_val = max(column_values.values())
+        min_val = min(column_values.values())
+        for elem_id, val in column_values.items():
+            if abs(val - max_val) < tolerance * max(abs(max_val), 1):
+                show_elements.add(elem_id)
+            if abs(val - min_val) < tolerance * max(abs(min_val), 1):
+                show_elements.add(elem_id)
+    
+    if beam_values:
+        max_val = max(beam_values.values())
+        min_val = min(beam_values.values())
+        for elem_id, val in beam_values.items():
+            if abs(val - max_val) < tolerance * max(abs(max_val), 1):
+                show_elements.add(elem_id)
+            if abs(val - min_val) < tolerance * max(abs(min_val), 1):
+                show_elements.add(elem_id)
+    
+    return show_elements
+
+
+def get_extreme_sensitivity_ids(sensitivities, classifications):
+    """
+    Get element IDs that have max/min sensitivities for each member type.
+    """
+    
+    column_values = {}
+    beam_values = {}
+    
+    for elem_id, data in sensitivities.items():
+        if elem_id not in classifications:
+            continue
+        
+        sens_val = data['dM_dEI']
+        
+        if classifications[elem_id] == 'column':
+            column_values[elem_id] = sens_val
+        else:
+            beam_values[elem_id] = sens_val
+    
+    show_elements = set()
+    tolerance = 1e-10
+    
+    if column_values:
+        max_val = max(column_values.values())
+        min_val = min(column_values.values())
+        for elem_id, val in column_values.items():
+            if abs(val - max_val) < tolerance * max(abs(max_val), 1e-20):
+                show_elements.add(elem_id)
+            if abs(val - min_val) < tolerance * max(abs(min_val), 1e-20):
+                show_elements.add(elem_id)
+    
+    if beam_values:
+        max_val = max(beam_values.values())
+        min_val = min(beam_values.values())
+        for elem_id, val in beam_values.items():
+            if abs(val - max_val) < tolerance * max(abs(max_val), 1e-20):
+                show_elements.add(elem_id)
+            if abs(val - min_val) < tolerance * max(abs(min_val), 1e-20):
+                show_elements.add(elem_id)
+    
+    return show_elements
 
 
 # =============================================================================
@@ -494,53 +701,48 @@ def plot_structure(ax, points, cells, color=COLOR_STRUCTURE,
                        fontsize=8, color='gray')
 
 
-def add_supports_l(ax, points, support_indices=None):
-    """Add left support symbols."""
+def add_supports(ax, points, support_indices=None):
+    """Add support symbols at fixed nodes."""
+    
     if support_indices is None:
-        support_indices, _ = find_support_indices(points)
+        min_y = np.min(points[:, 1])
+        support_indices = np.where(np.abs(points[:, 1] - min_y) < 0.01)[0]
     
-    if isinstance(support_indices, (int, np.integer)):
-        support_indices = [support_indices]
-    
-    size = 0.08
+    size = 0.15
     
     for idx in support_indices:
-        if idx >= len(points):
-            continue
         x, y = points[idx][0], points[idx][1]
-        ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
-        for hy in np.linspace(y - size, y + size, 6):
-            ax.plot([x, x - size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
-
-
-def add_supports_r(ax, points, support_indices=None):
-    """Add right support symbols."""
-    if support_indices is None:
-        _, support_indices = find_support_indices(points)
-    
-    if isinstance(support_indices, (int, np.integer)):
-        support_indices = [support_indices]
-    
-    size = 0.08
-    
-    for idx in support_indices:
-        if idx >= len(points):
-            continue
-        x, y = points[idx][0], points[idx][1]
-        ax.plot([x, x], [y - size, y + size], color='black', linewidth=1.5)
-        for hy in np.linspace(y - size, y + size, 6):
-            ax.plot([x, x + size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
+        
+        triangle = plt.Polygon([
+            [x, y],
+            [x - size, y - size],
+            [x + size, y - size]
+        ], fill=False, edgecolor='black', linewidth=1.5)
+        ax.add_patch(triangle)
+        
+        ax.plot([x - size*1.2, x + size*1.2], [y - size, y - size], 
+               'k-', linewidth=1.5)
+        
+        for hx in np.linspace(x - size, x + size, 4):
+            ax.plot([hx, hx - size*0.3], [y - size, y - size*1.3], 
+                   'k-', linewidth=0.8)
 
 
 def plot_moment_diagram_on_structure(ax, points, cells, moment_data, 
                                       scale, color, fill_color,
+                                      show_element_ids=None,
                                       linewidth=LINEWIDTH_DIAGRAM, 
-                                      show_fill=True, show_values=True, 
-                                      use_cell_data=True, show_connecting_lines=True,
+                                      show_fill=True, 
+                                      use_cell_data=True, 
+                                      show_connecting_lines=True,
                                       value_fontsize=9):
-    """Plot moment diagram perpendicular to each element."""
+    """
+    Plot moment diagram perpendicular to each element.
+    Only shows values for elements in show_element_ids.
+    """
     
     for idx, cell in enumerate(cells):
+        elem_id = idx + 1
         p1_idx, p2_idx = cell[0], cell[1]
         p1 = points[p1_idx][:2]
         p2 = points[p2_idx][:2]
@@ -556,7 +758,7 @@ def plot_moment_diagram_on_structure(ax, points, cells, moment_data,
             offset_p1 = p1 + perp * moment_value * scale
             offset_p2 = p2 + perp * moment_value * scale
             
-            if show_values and abs(moment_value) > 1:
+            if show_element_ids is not None and elem_id in show_element_ids and abs(moment_value) > 1:
                 mid_offset = (offset_p1 + offset_p2) / 2
                 text_pos = mid_offset + perp * np.sign(moment_value) * 0.02
                 
@@ -589,10 +791,16 @@ def plot_moment_diagram_on_structure(ax, points, cells, moment_data,
 
 
 def plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivity_values, 
-                                          scale, linewidth=LINEWIDTH_DIAGRAM, 
-                                          show_fill=True, show_values=True,
-                                          show_connecting_lines=True, value_fontsize=8):
-    """Plot sensitivity diagram perpendicular to each element."""
+                                          scale, 
+                                          show_element_ids=None,
+                                          linewidth=LINEWIDTH_DIAGRAM, 
+                                          show_fill=True,
+                                          show_connecting_lines=True, 
+                                          value_fontsize=8):
+    """
+    Plot sensitivity diagram perpendicular to each element.
+    Only shows values for elements in show_element_ids.
+    """
     
     for idx, cell in enumerate(cells):
         elem_id = idx + 1
@@ -632,7 +840,7 @@ def plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivity_values,
             polygon_y = [p1[1], offset_p1[1], offset_p2[1], p2[1]]
             ax.fill(polygon_x, polygon_y, color=fill_color, alpha=0.4)
         
-        if show_values and (len(cells) <= 10 or idx % (len(cells) // 8 + 1) == 0):
+        if show_element_ids is not None and elem_id in show_element_ids:
             mid_offset = (offset_p1 + offset_p2) / 2
             text_pos = mid_offset + perp * np.sign(sens_value) * 0.015
             
@@ -680,14 +888,15 @@ def compute_moment_sensitivity(E, I, L_elements, M_primary, M_dual):
     return sensitivities, total_sensitivity
 
 
-def print_results(E, I, sensitivities, total_sensitivity, geometry_info, response_element=None):
+def print_results(E, I, sensitivities, total_sensitivity, geometry_info, 
+                  classifications=None, response_element=None):
     """Print formatted sensitivity results."""
     EI = E * I
     
-    print("\n" + "=" * 75)
+    print("\n" + "=" * 80)
     print("MOMENT SENSITIVITY ANALYSIS: ∂M/∂(EI)")
     print("Using General Influence (Adjoint) Method")
-    print("=" * 75)
+    print("=" * 80)
     
     print(f"\nMaterial/Section Properties (from JSON):")
     print(f"  E  = {E:.4e} Pa")
@@ -699,22 +908,28 @@ def print_results(E, I, sensitivities, total_sensitivity, geometry_info, respons
     print(f"  Total length: {geometry_info['total_length']:.6f} m")
     print(f"  Beam span: {geometry_info['beam_span']:.6f} m")
     
+    if classifications:
+        n_columns = sum(1 for v in classifications.values() if v == 'column')
+        n_beams = sum(1 for v in classifications.values() if v == 'beam')
+        print(f"  Columns: {n_columns}, Beams: {n_beams}")
+    
     if response_element:
         print(f"\nResponse: Bending moment in Element {response_element}")
     
-    print("\n" + "-" * 75)
-    print(f"{'Elem k':^8} {'M_k [N·m]':^14} {'M̄_k [N·m]':^14} "
+    print("\n" + "-" * 80)
+    print(f"{'Elem k':^8} {'Type':^8} {'M_k [N·m]':^14} {'M̄_k [N·m]':^14} "
           f"{'L_k [m]':^10} {'∂M/∂(EI)_k':^20}")
-    print("-" * 75)
+    print("-" * 80)
     
     for eid, data in sorted(sensitivities.items()):
-        print(f"{eid:^8} {data['M_primary']:^+14.4f} {data['M_dual']:^+14.6f} "
+        member_type = classifications.get(eid, 'N/A')[:3].upper() if classifications else 'N/A'
+        print(f"{eid:^8} {member_type:^8} {data['M_primary']:^+14.4f} {data['M_dual']:^+14.6f} "
               f"{data['length']:^10.4f} {data['dM_dEI']:^+20.6e}")
     
-    print("-" * 75)
-    print(f"{'TOTAL':^8} {' ':^14} {' ':^14} "
+    print("-" * 80)
+    print(f"{'TOTAL':^8} {' ':^8} {' ':^14} {' ':^14} "
           f"{' ':^10} {total_sensitivity:^+20.6e}")
-    print("-" * 75)
+    print("-" * 80)
     
     delta_EI_percent = 10.0
     delta_EI = (delta_EI_percent / 100.0) * EI
@@ -733,12 +948,13 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      M_primary_dict, M_dual_dict,
                                      geometry_info,
                                      save_figures=True, output_folder="."):
-    """Create sensitivity visualization with diagrams plotted over the structure."""
+    """Create sensitivity visualization showing only max/min values per member type."""
     
     points = vtk_primary['points']
     cells = vtk_primary['cells']
     
-    left_supports, right_supports = find_support_indices(points)
+    # Get points from dual VTK for repeated node detection
+    points_dual = vtk_dual['points']
     
     cell_moment_primary = vtk_primary['cell_data'].get('MOMENT', np.zeros((len(cells), 3)))
     cell_moment_dual = vtk_dual['cell_data'].get('MOMENT', np.zeros((len(cells), 3)))
@@ -755,7 +971,33 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
         print(f"\nCreated output folder: {output_folder}")
     
     # =========================================================================
-    # PLOT 1: Primary Moment Diagram
+    # FIND REPEATED NODES FROM DUAL VTK
+    # =========================================================================
+    print("\n  Detecting repeated nodes from dual VTK...")
+    repeated_node_info = find_repeated_nodes(points_dual)
+    
+    # =========================================================================
+    # CLASSIFY MEMBERS AND GET EXTREME ELEMENT IDS
+    # =========================================================================
+    print("\n  Classifying members (columns vs beams)...")
+    classifications = classify_members(points, cells)
+    
+    n_columns = sum(1 for v in classifications.values() if v == 'column')
+    n_beams = sum(1 for v in classifications.values() if v == 'beam')
+    print(f"    Columns: {n_columns}, Beams: {n_beams}")
+    
+    show_primary_ids = get_extreme_element_ids(cell_moment_primary, classifications)
+    show_dual_ids = get_extreme_element_ids(cell_moment_dual, classifications)
+    show_sensitivity_ids = get_extreme_sensitivity_ids(sensitivities, classifications)
+    
+    print(f"    Showing primary moment values for elements: {sorted(show_primary_ids)}")
+    print(f"    Showing dual moment values for elements: {sorted(show_dual_ids)}")
+    print(f"    Showing sensitivity values for elements: {sorted(show_sensitivity_ids)}")
+    
+    max_M_dual = np.max(np.abs(cell_moment_dual[:, 2]))
+    
+    # =========================================================================
+    # PLOT 1: Primary Moment Diagram (NO circles)
     # =========================================================================
     
     fig1, ax = plt.subplots(figsize=(14, 6), dpi=FIGURE_DPI)
@@ -767,9 +1009,9 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      scale=PRIMARY_MOMENT_SCALE,
                                      color=COLOR_PRIMARY_MOMENT,
                                      fill_color=COLOR_FILL_PRIMARY,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                     show_element_ids=show_primary_ids,
+                                     use_cell_data=True)
+    add_supports(ax, points)
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
@@ -782,10 +1024,10 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'Min M: {min_M:.1f} N·m\n'
                 f'Scale: {PRIMARY_MOMENT_SCALE}\n'
                 f'─────────────\n'
-                f'Elements: {geometry_info["n_elements"]}\n'
-                f'Length: {geometry_info["total_length"]:.3f} m')
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10,
-           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                f'Elements: {geometry_info["n_elements"]}\n')
+    ax.text(0.5, 0.25, info_text, transform=ax.transAxes, fontsize=10,
+           horizontalalignment='center', verticalalignment='center', 
+           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'primary_moment_diagram.png')
@@ -795,9 +1037,12 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     plt.show()
     
     # =========================================================================
-    # PLOT 2: Dual Moment Diagram
+    # PLOT 2: Dual Moment Diagram (WITH circles for repeated nodes)
     # =========================================================================
     
+    max_M_dual_val = np.max(cell_moment_dual[:, 2])
+    min_M_dual_val = np.min(cell_moment_dual[:, 2])
+
     fig2, ax = plt.subplots(figsize=(14, 6), dpi=FIGURE_DPI)
     ax.set_title('Dual/Adjoint Bending Moment Diagram M̄(x)\n[From Unit Virtual Load at Response Location]', 
                  fontsize=14, fontweight='bold')
@@ -807,20 +1052,29 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      scale=DUAL_MOMENT_SCALE,
                                      color=COLOR_DUAL_MOMENT,
                                      fill_color=COLOR_FILL_DUAL,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                     show_element_ids=show_dual_ids,
+                                     use_cell_data=True)
+    add_supports(ax, points)
+    
+    # Add circles for repeated nodes
+    add_repeated_node_circles(ax, repeated_node_info, label='Response Location')
+    
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax.set_xlim(x_min - x_margin - max_M_dual*DUAL_MOMENT_SCALE, 
+                x_max + x_margin + max_M_dual*DUAL_MOMENT_SCALE)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', fontsize=9)
     
-    max_M_dual = np.max(cell_moment_dual[:, 2])
-    min_M_dual = np.min(cell_moment_dual[:, 2])
-    info_text = f'Max M̄: {max_M_dual:.1f} N·m\nMin M̄: {min_M_dual:.1f} N·m\nScale: {DUAL_MOMENT_SCALE}'
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10,
-           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    info_text = (f'Max M̄: {max_M_dual_val:.1f} N·m\n'
+                f'Min M̄: {min_M_dual_val:.1f} N·m\n'
+                f'Scale: {DUAL_MOMENT_SCALE}\n'
+                f'─────────────────\n'
+                f'Elements: {geometry_info["n_elements"]}\n')
+    ax.text(0.5, 0.25, info_text, transform=ax.transAxes, fontsize=10,
+           horizontalalignment='center', verticalalignment='center', 
+           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'dual_moment_diagram.png')
@@ -830,7 +1084,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     plt.show()
     
     # =========================================================================
-    # PLOT 3: Sensitivity Diagram (with TOTAL displayed)
+    # PLOT 3: Sensitivity Diagram (WITH circles for repeated nodes)
     # =========================================================================
     
     fig3, ax = plt.subplots(figsize=(14, 6), dpi=FIGURE_DPI)
@@ -840,23 +1094,28 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                   show_element_labels=True)
     plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivities,
                                           scale=SENSITIVITY_SCALE,
-                                          show_values=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                          show_element_ids=show_sensitivity_ids)
+    add_supports(ax, points)
+    
+    # Add circles for repeated nodes
+    add_repeated_node_circles(ax, repeated_node_info, label='Response Location')
+    
     ax.set_xlabel('X (m)', fontsize=11)
     ax.set_ylabel('Y (m)', fontsize=11)
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+    ax.set_xlim(x_min - x_margin, x_max + x_margin + 2)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
-    # Legend
+    # Legend with sensitivity colors and response location
     pos_patch = mpatches.Patch(color=COLOR_FILL_SENSITIVITY_POS, alpha=0.4, 
                                label='Positive: ↑EI → ↑M')
     neg_patch = mpatches.Patch(color=COLOR_FILL_SENSITIVITY_NEG, alpha=0.4, 
                                label='Negative: ↑EI → ↓M')
-    ax.legend(handles=[pos_patch, neg_patch], loc='upper right', fontsize=10)
+    response_line = plt.Line2D([0], [0], color=COLOR_REPEATED_NODE, 
+                                linewidth=REPEATED_NODE_CIRCLE_LINEWIDTH,
+                                label='Response Location')
+    ax.legend(handles=[pos_patch, neg_patch, response_line], loc='upper right', fontsize=9)
     
-    # Info box with TOTAL SENSITIVITY prominently displayed
     max_sens = max(s['dM_dEI'] for s in sensitivities.values())
     min_sens = min(s['dM_dEI'] for s in sensitivities.values())
     info_text = (f'E = {E:.2e} Pa\n'
@@ -864,7 +1123,6 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'EI = {EI:.2e} N·m²\n'
                 f'─────────────────\n'
                 f'Elements: {geometry_info["n_elements"]}\n'
-                f'Length: {geometry_info["total_length"]:.3f} m\n'
                 f'Scale: {SENSITIVITY_SCALE:.0e}\n'
                 f'─────────────────\n'
                 f'Max: {max_sens:.4e}\n'
@@ -873,16 +1131,9 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'TOTAL ∂M/∂(EI):\n'
                 f'{total_sensitivity:.4e}')
     
-    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=9,
-           verticalalignment='top', family='monospace',
+    ax.text(0.75, 0.5, info_text, transform=ax.transAxes, fontsize=9,
+           horizontalalignment='center', verticalalignment='center', family='monospace',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.9, edgecolor='black'))
-    
-    # Prominent total sensitivity annotation at bottom center
-    ax.text(0.5, 0.02, f'Σ ∂M/∂(EI) = {total_sensitivity:.6e}', 
-           transform=ax.transAxes, fontsize=12, fontweight='bold',
-           ha='center', va='bottom',
-           bbox=dict(boxstyle='round,pad=0.5', facecolor='#FFD700', alpha=0.9, 
-                    edgecolor='black', linewidth=2))
     
     if save_figures:
         filepath = os.path.join(output_folder, 'sensitivity_diagram.png')
@@ -892,13 +1143,13 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     plt.show()
     
     # =========================================================================
-    # PLOT 4: All Three Diagrams Stacked Vertically
+    # PLOT 4: All Three Diagrams Side by Side (Horizontal)
     # =========================================================================
-    
-    fig4, axes = plt.subplots(3, 1, figsize=(14, 14), dpi=FIGURE_DPI)
+
+    fig4, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=FIGURE_DPI)
     fig4.suptitle('Sensitivity Analysis: Complete Diagram Set', fontsize=14, fontweight='bold')
-    
-    # Primary Moment
+
+    # Primary Moment (no circles)
     ax = axes[0]
     ax.set_title('Primary Moment M(x)', fontsize=12, fontweight='bold')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
@@ -906,15 +1157,16 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      scale=PRIMARY_MOMENT_SCALE,
                                      color=COLOR_PRIMARY_MOMENT,
                                      fill_color=COLOR_FILL_PRIMARY,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                     show_element_ids=show_primary_ids,
+                                     use_cell_data=True)
+    add_supports(ax, points)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
-    # Dual Moment
+
+    # Dual Moment (with circles)
     ax = axes[1]
     ax.set_title('Dual Moment M̄(x)', fontsize=12, fontweight='bold')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
@@ -922,44 +1174,57 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                                      scale=DUAL_MOMENT_SCALE,
                                      color=COLOR_DUAL_MOMENT,
                                      fill_color=COLOR_FILL_DUAL,
-                                     show_values=True, use_cell_data=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
-    ax.set_xlim(x_min - x_margin, x_max + x_margin)
+                                     show_element_ids=show_dual_ids,
+                                     use_cell_data=True)
+    add_supports(ax, points)
+    add_repeated_node_circles(ax, repeated_node_info, label=None)  # No label for combined plot
+    ax.set_xlim(x_min - x_margin - max_M_dual*DUAL_MOMENT_SCALE, 
+                x_max + x_margin + max_M_dual*DUAL_MOMENT_SCALE)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
-    # Sensitivity
+
+    # Sensitivity (with circles)
     ax = axes[2]
     ax.set_title(f'Sensitivity ∂M/∂(EI)  |  TOTAL = {total_sensitivity:.4e}', 
                 fontsize=12, fontweight='bold', color='#8B0000')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivities,
                                           scale=SENSITIVITY_SCALE,
-                                          show_values=True)
-    add_supports_l(ax, points, support_indices=left_supports)
-    add_supports_r(ax, points, support_indices=right_supports)
+                                          show_element_ids=show_sensitivity_ids)
+    add_supports(ax, points)
+    add_repeated_node_circles(ax, repeated_node_info, label=None)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
-    
-    # Add total in corner
-    ax.text(0.98, 0.02, f'Σ = {total_sensitivity:.4e}', 
-           transform=ax.transAxes, fontsize=11, fontweight='bold',
-           ha='right', va='bottom',
-           bbox=dict(boxstyle='round', facecolor='#FFD700', alpha=0.9))
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    
+
+    ax.text(0.5, 0.02, f'Σ = {total_sensitivity:.4e}', 
+        transform=ax.transAxes, fontsize=11, fontweight='bold',
+        ha='center', va='bottom',
+        bbox=dict(boxstyle='round', facecolor='#FFD700', alpha=0.9))
+
+    # Add a common legend for the combined plot
+    response_circle = plt.Line2D([0], [0], marker='o', color='w', 
+                                  markeredgecolor=COLOR_REPEATED_NODE,
+                                  markerfacecolor='none',
+                                  markersize=12, markeredgewidth=2.5,
+                                  label='Response Location')
+    fig4.legend(handles=[response_circle], loc='upper right', 
+                bbox_to_anchor=(0.99, 0.95), fontsize=10)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
     if save_figures:
-        filepath = os.path.join(output_folder, 'sensitivity_stacked.png')
+        filepath = os.path.join(output_folder, 'sensitivity_horizontal.png')
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
         print(f"Saved: {filepath}")
-    
+
     plt.show()
+    
+    return classifications, repeated_node_info
 
 
 # =============================================================================
@@ -971,43 +1236,14 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
          create_plots=True, save_plots=True, output_dir="."):
     """
     Main function - compute sensitivity from VTK files with visualization.
-    
-    Material properties and geometry are automatically extracted from files.
-    
-    Parameters:
-    -----------
-    primary_vtk_path : str
-        Path to primary analysis VTK file
-    dual_vtk_path : str
-        Path to dual analysis VTK file
-    material_json_path : str, optional
-        Path to StructuralMaterials.json. If None, will search automatically.
-    E : float, optional
-        Young's modulus override (if not using JSON)
-    I : float, optional
-        Second moment of area override (if not using JSON)
-    response_element : int, optional
-        Response element ID for labeling
-    create_plots : bool
-        Whether to create plots
-    save_plots : bool
-        Whether to save plots
-    output_dir : str
-        Output directory for plots
-        
-    Returns:
-    --------
-    tuple : (sensitivities dict, total sensitivity)
     """
     
-    print("=" * 75)
+    print("=" * 80)
     print("MOMENT SENSITIVITY ANALYSIS: ∂M/∂(EI)")
     print("Using Adjoint Method with VTK File Parsing")
-    print("=" * 75)
+    print("=" * 80)
     
-    # =========================================================================
     # Step 1: Parse Primary VTK File
-    # =========================================================================
     print(f"\n1. Loading Primary VTK: {primary_vtk_path}")
     vtk_primary = parse_vtk_file(primary_vtk_path)
     M_primary = parse_vtk_cell_moments(primary_vtk_path)
@@ -1018,9 +1254,7 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
     
     print(f"   Found {len(M_primary)} elements with primary moments")
     
-    # =========================================================================
     # Step 2: Parse Dual VTK File
-    # =========================================================================
     print(f"\n2. Loading Dual VTK: {dual_vtk_path}")
     vtk_dual = parse_vtk_file(dual_vtk_path)
     M_dual = parse_vtk_cell_moments(dual_vtk_path)
@@ -1031,22 +1265,16 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
     
     print(f"   Found {len(M_dual)} elements with dual moments")
     
-    # =========================================================================
-    # Step 3: Extract Geometry from VTK (automatic)
-    # =========================================================================
+    # Step 3: Extract Geometry from VTK
     print("\n3. Extracting geometry from VTK...")
     geometry_info = calculate_geometry_from_vtk(vtk_primary)
     
-    # =========================================================================
-    # Step 4: Load Material Properties (from JSON or parameters)
-    # =========================================================================
+    # Step 4: Load Material Properties
     print("\n4. Loading material properties...")
     
     if E is not None and I is not None:
-        # Use provided values
         print(f"   Using provided values: E = {E:.4e} Pa, I = {I:.4e} m⁴")
     else:
-        # Try to find and load from JSON
         if material_json_path is None:
             material_json_path = find_material_json(primary_vtk_path)
         
@@ -1055,13 +1283,20 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
             E = material_props['E']
             I = material_props['I']
         else:
-            raise ValueError("Material properties not provided and StructuralMaterials.json not found. "
-                           "Please provide E and I values or path to JSON file.")
+            raise ValueError("Material properties not provided and StructuralMaterials.json not found.")
     
-    # =========================================================================
-    # Step 5: Reconcile element data
-    # =========================================================================
-    print("\n5. Reconciling element data...")
+    # Step 5: Classify members
+    print("\n5. Classifying members...")
+    points = vtk_primary['points']
+    cells = vtk_primary['cells']
+    classifications = classify_members(points, cells)
+    
+    n_columns = sum(1 for v in classifications.values() if v == 'column')
+    n_beams = sum(1 for v in classifications.values() if v == 'beam')
+    print(f"   Columns: {n_columns}, Beams: {n_beams}")
+    
+    # Step 6: Reconcile element data
+    print("\n6. Reconciling element data...")
     
     primary_elem_ids = set(M_primary.keys())
     dual_elem_ids = set(M_dual.keys())
@@ -1074,28 +1309,22 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
     M_primary_common = {k: v for k, v in M_primary.items() if k in common_elem_ids}
     M_dual_common = {k: v for k, v in M_dual.items() if k in common_elem_ids}
     
-    # Get element lengths from geometry
     L_elements = {k: v for k, v in geometry_info['element_lengths'].items() if k in common_elem_ids}
     
-    # =========================================================================
-    # Step 6: Compute Sensitivities
-    # =========================================================================
-    print("\n6. Computing sensitivities...")
+    # Step 7: Compute Sensitivities
+    print("\n7. Computing sensitivities...")
     
     sensitivities, total_sensitivity = compute_moment_sensitivity(
         E, I, L_elements, M_primary_common, M_dual_common
     )
     
-    # =========================================================================
-    # Step 7: Print Results
-    # =========================================================================
-    print_results(E, I, sensitivities, total_sensitivity, geometry_info, response_element)
+    # Step 8: Print Results
+    print_results(E, I, sensitivities, total_sensitivity, geometry_info, 
+                  classifications, response_element)
     
-    # =========================================================================
-    # Step 8: Create Visualizations
-    # =========================================================================
+    # Step 9: Create Visualizations
     if create_plots:
-        print("\n7. Creating visualizations...")
+        print("\n8. Creating visualizations...")
         
         create_sensitivity_visualization(
             vtk_primary, vtk_dual, E, I,
@@ -1115,21 +1344,16 @@ def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
 
 if __name__ == "__main__":
     
-    # =========================================================================
-    # USER INPUT - Only need to specify file paths!
-    # =========================================================================
-    
     # VTK file paths (required)
-    PRIMARY_VTK = "test_files/SA_beam_2D_udl_kink.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"
-    DUAL_VTK = "test_files/SA_beam_2D_udl_kink.gid/vtk_output_dual/Parts_Beam_Beams_0_1.vtk"
+    PRIMARY_VTK = os.path.join(FOLDER, "vtk_output/Parts_Beam_Beams_0_1.vtk")  
+    DUAL_VTK = os.path.join(FOLDER, "vtk_output_dual/Parts_Beam_Beams_0_1.vtk")
     
     # Material JSON path (optional - will auto-search if None)
-    MATERIAL_JSON = "test_files/SA_beam_2D_udl_kink.gid/StructuralMaterials.json"
-    # MATERIAL_JSON = None  # Uncomment to auto-search
+    MATERIAL_JSON = os.path.join(FOLDER, "StructuralMaterials.json")
     
     # Optional manual overrides (set to None to use JSON values)
-    E_OVERRIDE = None  # e.g., 2.1e11 to override
-    I_OVERRIDE = None  # e.g., 5e-6 to override
+    E_OVERRIDE = None
+    I_OVERRIDE = None
     
     # Response element (optional)
     RESPONSE_ELEMENT = None
@@ -1139,9 +1363,7 @@ if __name__ == "__main__":
     SAVE_PLOTS = True
     OUTPUT_DIR = OUTPUT_FOLDER
     
-    # =========================================================================
     # Run Analysis
-    # =========================================================================
     sensitivities, total = main(
         primary_vtk_path=PRIMARY_VTK,
         dual_vtk_path=DUAL_VTK,
