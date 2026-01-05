@@ -20,7 +20,6 @@ Features:
 - Highlights max/min values per member type
 - Marks response location from hinge_info.json
 - Properly handles dual VTK with duplicate kink nodes
-- Secondary Y-axis showing actual values with units
 
 Author: SA Pipeline
 """
@@ -32,7 +31,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.patches import Circle, Rectangle, Polygon
-from matplotlib.ticker import FuncFormatter
 from typing import Dict, List, Tuple, Optional, Any
 
 # Add parent directory to path for imports
@@ -75,7 +73,7 @@ LINEWIDTH_STRUCTURE = 2.0
 LINEWIDTH_DIAGRAM = 1.5
 LINEWIDTH_RESPONSE = 2.0
 FIGURE_DPI = 100
-RESPONSE_CIRCLE_RADIUS = 0.05
+RESPONSE_CIRCLE_RADIUS = 0.05  # Smaller circle
 SUPPORT_SIZE = 0.15
 
 
@@ -302,11 +300,6 @@ def find_support_nodes(points: np.ndarray, structure_type: str) -> Dict[str, Lis
     return supports
 
 
-def get_beam_reference_y(points: np.ndarray) -> float:
-    """Get the Y coordinate of the beam reference line."""
-    return np.mean(points[:, 1])
-
-
 def get_extreme_elements(values: Dict[int, float], classifications: Dict[int, str]) -> set:
     """Get element IDs with max/min values per member type."""
     
@@ -406,52 +399,6 @@ def calculate_scales(vtk_primary: Dict, vtk_dual: Optional[Dict],
             scales['sensitivity'] = 1e6
     
     return scales
-
-
-# =============================================================================
-# SECONDARY AXIS FOR ACTUAL VALUES
-# =============================================================================
-
-def add_value_axis(ax, scale: float, beam_y: float, label: str, color: str = 'darkblue'):
-    """
-    Add secondary Y-axis showing actual physical values.
-    
-    Parameters
-    ----------
-    ax : matplotlib axis
-    scale : scale factor used for plotting
-    beam_y : Y coordinate of beam reference line
-    label : axis label with units
-    color : color for axis labels
-    """
-    ax2 = ax.twinx()
-    
-    # Get current y limits
-    y_min, y_max = ax.get_ylim()
-    
-    # Convert geometric Y to actual values
-    # actual_value = (y - beam_y) / scale
-    actual_min = (y_min - beam_y) / scale
-    actual_max = (y_max - beam_y) / scale
-    
-    ax2.set_ylim(actual_min, actual_max)
-    ax2.set_ylabel(label, fontsize=11, color=color)
-    ax2.tick_params(axis='y', labelcolor=color)
-    
-    # Use scientific notation for large/small values
-    ax2.ticklabel_format(axis='y', style='scientific', scilimits=(-3, 4))
-    
-    return ax2
-
-
-def format_value_with_unit(value: float, unit: str) -> str:
-    """Format value with appropriate scientific notation and unit."""
-    if abs(value) < 1e-10:
-        return f"0 {unit}"
-    elif abs(value) >= 1e4 or abs(value) < 1e-3:
-        return f"{value:.2e} {unit}"
-    else:
-        return f"{value:.4f} {unit}"
 
 
 # =============================================================================
@@ -745,7 +692,7 @@ def create_all_plots(config: Config,
                      vtk_primary: Dict, vtk_dual: Dict,
                      sensitivity_values: Optional[Dict[int, float]] = None,
                      total_sensitivity: Optional[float] = None) -> None:
-    """Create all visualization plots with proper value axes."""
+    """Create all visualization plots."""
     
     print("\n" + "=" * 70)
     print("GENERATING PLOTS")
@@ -764,13 +711,8 @@ def create_all_plots(config: Config,
     supports_primary = find_support_nodes(points_primary, structure_type)
     supports_dual = find_support_nodes(points_dual, structure_type)
     
-    # Get beam reference Y for value axis
-    beam_y_primary = get_beam_reference_y(points_primary)
-    beam_y_dual = get_beam_reference_y(points_dual)
-    
     print(f"  Structure type: {structure_type}")
     print(f"  Support type: {support_type}")
-    print(f"  Beam reference Y: {beam_y_primary:.4f}")
     
     response_info = get_response_location_info(config)
     response_location = response_info['position']
@@ -783,7 +725,7 @@ def create_all_plots(config: Config,
         classifications[idx + 1] = classify_element(p1, p2)
     
     scales = calculate_scales(vtk_primary, vtk_dual, sensitivity_values, config)
-    print(f"  Scales: deflection={scales['deflection']:.2f}, moment={scales['moment_primary']:.2e}")
+    print(f"  Scales: deflection={scales['deflection']:.2f}, moment={scales['moment_primary']:.6f}")
     
     os.makedirs(config.paths.plots_dir, exist_ok=True)
     
@@ -807,7 +749,7 @@ def create_all_plots(config: Config,
     x_margin = (x_max - x_min) * 0.25 if x_max > x_min else 0.5
     y_margin = max((y_max - y_min) * 0.3, 0.3)
     
-    # Get actual max/min values
+    # Get actual max/min values for annotations
     max_disp_primary = np.max(np.abs(displacement_primary[:, 1]))
     max_disp_dual = np.max(np.abs(displacement_dual[:, 1]))
     max_moment_primary = np.max(np.abs(moment_primary[:, 2]))
@@ -822,7 +764,7 @@ def create_all_plots(config: Config,
     ax.set_title('Structure Diagram', fontsize=14, fontweight='bold')
     plot_structure(ax, points_primary, cells_primary, show_node_labels=True, show_element_labels=True)
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_ylim(y_min - y_margin, y_max + y_margin)
@@ -835,18 +777,17 @@ def create_all_plots(config: Config,
     # PLOT 2: Deflection Primary
     print("  2. Plotting deflection (primary)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Deflection Diagram - Primary Analysis\nMax: {format_value_with_unit(max_disp_primary, "m")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Deflection Diagram - Primary Analysis\n(Scale: {scales["deflection"]:.0f}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_deflection_diagram(ax, points_primary, cells_primary, displacement_primary, scales['deflection'])
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    # Add secondary axis for actual deflection values
-    add_value_axis(ax, scales['deflection'], beam_y_primary, 'Deflection (m)', color='blue')
+    ax.text(0.02, 0.98, f'Max Deflection: {max_disp_primary:.4e} m', transform=ax.transAxes, fontsize=10, 
+           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -854,20 +795,20 @@ def create_all_plots(config: Config,
     # PLOT 3: Deflection Dual
     print("  3. Plotting deflection (dual)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Deflection Influence Line - Dual Analysis\nMax: {format_value_with_unit(max_disp_dual, "m")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Deflection Influence Line - Dual Analysis\n(Scale: {scales["deflection_dual"]:.0f}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_deflection_diagram(ax, points_dual, cells_dual, displacement_dual, scales['deflection_dual'],
                            color=COLORS['deflection_dual'], fill_color=COLORS['fill_deflection_dual'])
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label='Response Location')
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
-    add_value_axis(ax, scales['deflection_dual'], beam_y_dual, 'Deflection (m)', color='darkcyan')
+    ax.text(0.02, 0.98, f'Max Deflection: {max_disp_dual:.4e} m', transform=ax.transAxes, fontsize=10, 
+           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -875,19 +816,19 @@ def create_all_plots(config: Config,
     # PLOT 4: Moment Primary
     print("  4. Plotting bending moment (primary)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Bending Moment Diagram - Primary Analysis\nMax: {format_value_with_unit(max_moment_primary, "N·m")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Bending Moment Diagram - Primary Analysis\n(Scale: {scales["moment_primary"]:.2e}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_moment_diagram(ax, points_primary, cells_primary, moment_primary, scales['moment_primary'],
                        COLORS['moment_primary'], COLORS['fill_moment_primary'],
                        show_values=True, show_element_ids=show_primary_ids, classifications=classifications)
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['moment_primary'], beam_y_primary, 'Moment (N·m)', color='darkred')
+    ax.text(0.02, 0.98, f'Max Moment: {max_moment_primary:.4e} N·m', transform=ax.transAxes, fontsize=10, 
+           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'moment_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -895,21 +836,21 @@ def create_all_plots(config: Config,
     # PLOT 5: Moment Dual
     print("  5. Plotting bending moment (dual)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Bending Moment Diagram - Dual Analysis\nMax: {format_value_with_unit(max_moment_dual, "N·m")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Bending Moment Diagram - Dual Analysis\n(Scale: {scales["moment_dual"]:.2e}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_moment_diagram(ax, points_dual, cells_dual, moment_dual, scales['moment_dual'],
                        COLORS['moment_dual'], COLORS['fill_moment_dual'],
                        show_values=True, show_element_ids=show_dual_ids, classifications=classifications)
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label='Response Location')
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
-    add_value_axis(ax, scales['moment_dual'], beam_y_dual, 'Moment (N·m)', color='darkgreen')
+    ax.text(0.02, 0.98, f'Max Moment: {max_moment_dual:.4e} N·m', transform=ax.transAxes, fontsize=10, 
+           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'moment_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -917,17 +858,17 @@ def create_all_plots(config: Config,
     # PLOT 6: Rotation Primary
     print("  6. Plotting rotation (primary)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Rotation Diagram - Primary Analysis\nMax: {format_value_with_unit(max_rot_primary, "rad")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Rotation Diagram - Primary Analysis\n(Scale: {scales["rotation"]:.0f}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_rotation_diagram(ax, points_primary, cells_primary, rotation_primary, scales['rotation'])
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['rotation'], beam_y_primary, 'Rotation (rad)', color='purple')
+    ax.text(0.02, 0.98, f'Max Rotation: {max_rot_primary:.4e} rad', transform=ax.transAxes, fontsize=10, 
+           verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -935,20 +876,21 @@ def create_all_plots(config: Config,
     # PLOT 7: Rotation Dual
     print("  7. Plotting rotation (dual)...")
     fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-    ax.set_title(f'Rotation Diagram - Dual Analysis (Unit Kink)\nΔθ: {format_value_with_unit(max_rot_dual - min_rot_dual, "rad")}', 
-                fontsize=14, fontweight='bold')
+    ax.set_title(f'Rotation Diagram - Dual Analysis (Unit Kink)\n(Scale: {scales["rotation_dual"]:.0f}x)', fontsize=14, fontweight='bold')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_rotation_diagram(ax, points_dual, cells_dual, rotation_dual, scales['rotation_dual'],
                          color=COLORS['rotation_dual'], fill_color=COLORS['fill_rotation_dual'])
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label='Kink Location')
-    ax.set_xlabel('Position (m)')
+    ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
-    add_value_axis(ax, scales['rotation_dual'], beam_y_dual, 'Rotation (rad)', color='darkmagenta')
+    ax.text(0.02, 0.98, f'θ_left: {min_rot_dual:.4f} rad\nθ_right: {max_rot_dual:.4f} rad\nΔθ: {max_rot_dual - min_rot_dual:.4f} rad', 
+           transform=ax.transAxes, fontsize=10, verticalalignment='top',
+           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
         plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
@@ -961,14 +903,16 @@ def create_all_plots(config: Config,
         total_sens = sum(sensitivity_values.values())
         
         fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-        ax.set_title(f'Sensitivity Diagram: ∂M/∂(EI)\nTotal: {format_value_with_unit(total_sens, "")}', 
-                    fontsize=14, fontweight='bold')
+        title = f'Sensitivity Diagram: ∂M_response/∂(EI)\n(Scale: {scales["sensitivity"]:.2e}x)'
+        if total_sensitivity is not None:
+            title += f'  |  TOTAL = {total_sensitivity:.4e}'
+        ax.set_title(title, fontsize=14, fontweight='bold')
         plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
         plot_sensitivity_diagram(ax, points_primary, cells_primary, sensitivity_values, scales['sensitivity'],
                                 show_values=True, show_element_ids=show_sens_ids)
         add_supports(ax, points_primary, supports_primary, support_type, structure_type)
         add_response_circle(ax, response_location, label='Response Location')
-        ax.set_xlabel('Position (m)')
+        ax.set_xlabel('X (m)')
         ax.set_ylabel('Y (m)')
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
         ax.set_aspect('equal')
@@ -976,14 +920,16 @@ def create_all_plots(config: Config,
         pos_patch = mpatches.Patch(color=COLORS['fill_sensitivity_pos'], alpha=0.4, label='Positive: ↑EI → ↑M')
         neg_patch = mpatches.Patch(color=COLORS['fill_sensitivity_neg'], alpha=0.4, label='Negative: ↑EI → ↓M')
         ax.legend(handles=[pos_patch, neg_patch], loc='upper right')
-        add_value_axis(ax, scales['sensitivity'], beam_y_primary, 'Sensitivity ∂M/∂(EI)', color='darkgreen')
+        ax.text(0.02, 0.98, f'Max: {max_sens:.4e}\nMin: {min_sens:.4e}\nTotal: {total_sens:.4e}', 
+               transform=ax.transAxes, fontsize=10, verticalalignment='top',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
         if config.plotting.save_figures:
             plt.savefig(os.path.join(config.paths.plots_dir, 'sensitivity.png'), dpi=300, bbox_inches='tight')
         plt.close()
     
     # PLOT 9: Combined Primary
     print("  9. Plotting combined primary...")
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10), dpi=FIGURE_DPI)
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10), dpi=FIGURE_DPI)
     fig.suptitle('Primary Analysis Results', fontsize=14, fontweight='bold')
     
     ax = axes[0, 0]
@@ -991,44 +937,37 @@ def create_all_plots(config: Config,
     plot_structure(ax, points_primary, cells_primary, show_element_labels=True)
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     
     ax = axes[0, 1]
-    ax.set_title(f'Deflection (Max: {format_value_with_unit(max_disp_primary, "m")})')
+    ax.set_title(f'Deflection (Max: {max_disp_primary:.4e} m)')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_deflection_diagram(ax, points_primary, cells_primary, displacement_primary, scales['deflection'])
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['deflection'], beam_y_primary, 'Deflection (m)', color='blue')
     
     ax = axes[1, 0]
-    ax.set_title(f'Bending Moment (Max: {format_value_with_unit(max_moment_primary, "N·m")})')
+    ax.set_title(f'Bending Moment (Max: {max_moment_primary:.4e} N·m)')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_moment_diagram(ax, points_primary, cells_primary, moment_primary, scales['moment_primary'],
                        COLORS['moment_primary'], COLORS['fill_moment_primary'],
                        show_values=True, show_element_ids=show_primary_ids, classifications=classifications)
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['moment_primary'], beam_y_primary, 'Moment (N·m)', color='darkred')
     
     ax = axes[1, 1]
-    ax.set_title(f'Rotation (Max: {format_value_with_unit(max_rot_primary, "rad")})')
+    ax.set_title(f'Rotation (Max: {max_rot_primary:.4e} rad)')
     plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
     plot_rotation_diagram(ax, points_primary, cells_primary, rotation_primary, scales['rotation'])
     add_supports(ax, points_primary, supports_primary, support_type, structure_type)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['rotation'], beam_y_primary, 'Rotation (rad)', color='purple')
     
     plt.tight_layout()
     if config.plotting.save_figures:
@@ -1037,7 +976,7 @@ def create_all_plots(config: Config,
     
     # PLOT 10: Combined Dual
     print("  10. Plotting combined dual...")
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10), dpi=FIGURE_DPI)
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10), dpi=FIGURE_DPI)
     fig.suptitle('Dual Analysis Results', fontsize=14, fontweight='bold')
     
     ax = axes[0, 0]
@@ -1046,26 +985,23 @@ def create_all_plots(config: Config,
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label='Response Location')
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right', fontsize=8)
     
     ax = axes[0, 1]
-    ax.set_title(f'Deflection (Max: {format_value_with_unit(max_disp_dual, "m")})')
+    ax.set_title(f'Deflection (Max: {max_disp_dual:.4e} m)')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_deflection_diagram(ax, points_dual, cells_dual, displacement_dual, scales['deflection_dual'],
                            color=COLORS['deflection_dual'], fill_color=COLORS['fill_deflection_dual'])
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label=None)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['deflection_dual'], beam_y_dual, 'Deflection (m)', color='darkcyan')
     
     ax = axes[1, 0]
-    ax.set_title(f'Bending Moment (Max: {format_value_with_unit(max_moment_dual, "N·m")})')
+    ax.set_title(f'Bending Moment (Max: {max_moment_dual:.4e} N·m)')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_moment_diagram(ax, points_dual, cells_dual, moment_dual, scales['moment_dual'],
                        COLORS['moment_dual'], COLORS['fill_moment_dual'],
@@ -1073,23 +1009,19 @@ def create_all_plots(config: Config,
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label=None)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['moment_dual'], beam_y_dual, 'Moment (N·m)', color='darkgreen')
     
     ax = axes[1, 1]
-    ax.set_title(f'Rotation (Δθ: {format_value_with_unit(max_rot_dual - min_rot_dual, "rad")})')
+    ax.set_title(f'Rotation (Δθ: {max_rot_dual - min_rot_dual:.4f} rad)')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_rotation_diagram(ax, points_dual, cells_dual, rotation_dual, scales['rotation_dual'],
                          color=COLORS['rotation_dual'], fill_color=COLORS['fill_rotation_dual'])
     add_supports(ax, points_dual, supports_dual, support_type, structure_type)
     add_response_circle(ax, response_location, label=None)
     ax.set_xlim(x_min - x_margin, x_max + x_margin)
-    ax.set_xlabel('Position (m)')
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    add_value_axis(ax, scales['rotation_dual'], beam_y_dual, 'Rotation (rad)', color='darkmagenta')
     
     plt.tight_layout()
     if config.plotting.save_figures:
@@ -1099,24 +1031,22 @@ def create_all_plots(config: Config,
     # PLOT 11: Combined Sensitivity
     if sensitivity_values:
         print("  11. Plotting combined sensitivity...")
-        fig, axes = plt.subplots(1, 3, figsize=(20, 6), dpi=FIGURE_DPI)
-        fig.suptitle('Sensitivity Analysis: ∂M/∂(EI)', fontsize=14, fontweight='bold')
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=FIGURE_DPI)
+        fig.suptitle('Sensitivity Analysis: ∂M_response/∂(EI)', fontsize=14, fontweight='bold')
         
         ax = axes[0]
-        ax.set_title(f'Primary Moment M(x)\n(Max: {format_value_with_unit(max_moment_primary, "N·m")})')
+        ax.set_title(f'Primary Moment M(x)\n(Max: {max_moment_primary:.4e} N·m)')
         plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
         plot_moment_diagram(ax, points_primary, cells_primary, moment_primary, scales['moment_primary'],
                            COLORS['moment_primary'], COLORS['fill_moment_primary'],
                            show_values=True, show_element_ids=show_primary_ids, classifications=classifications)
         add_supports(ax, points_primary, supports_primary, support_type, structure_type)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
-        ax.set_xlabel('Position (m)')
         ax.set_aspect('equal')
         ax.grid(True, alpha=0.3)
-        add_value_axis(ax, scales['moment_primary'], beam_y_primary, 'Moment (N·m)', color='darkred')
         
         ax = axes[1]
-        ax.set_title(f'Dual Moment M̄(x)\n(Max: {format_value_with_unit(max_moment_dual, "N·m")})')
+        ax.set_title(f'Dual Moment M̄(x)\n(Max: {max_moment_dual:.4e} N·m)')
         plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
         plot_moment_diagram(ax, points_dual, cells_dual, moment_dual, scales['moment_dual'],
                            COLORS['moment_dual'], COLORS['fill_moment_dual'],
@@ -1124,24 +1054,20 @@ def create_all_plots(config: Config,
         add_supports(ax, points_dual, supports_dual, support_type, structure_type)
         add_response_circle(ax, response_location, label=None)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
-        ax.set_xlabel('Position (m)')
         ax.set_aspect('equal')
         ax.grid(True, alpha=0.3)
-        add_value_axis(ax, scales['moment_dual'], beam_y_dual, 'Moment (N·m)', color='darkgreen')
         
         ax = axes[2]
         total_sens = sum(sensitivity_values.values())
-        ax.set_title(f'Sensitivity ∂M/∂(EI)\n(Total: {format_value_with_unit(total_sens, "")})', color='#8B0000', fontweight='bold')
+        ax.set_title(f'Sensitivity ∂M_response/∂(EI)\n(Total: {total_sens:.4e})', color='#8B0000', fontweight='bold')
         plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
         plot_sensitivity_diagram(ax, points_primary, cells_primary, sensitivity_values, scales['sensitivity'],
                                 show_values=True, show_element_ids=show_sens_ids)
         add_supports(ax, points_primary, supports_primary, support_type, structure_type)
         add_response_circle(ax, response_location, label=None)
         ax.set_xlim(x_min - x_margin, x_max + x_margin)
-        ax.set_xlabel('Position (m)')
         ax.set_aspect('equal')
         ax.grid(True, alpha=0.3)
-        add_value_axis(ax, scales['sensitivity'], beam_y_primary, 'Sensitivity', color='darkgreen')
         
         plt.tight_layout()
         if config.plotting.save_figures:
