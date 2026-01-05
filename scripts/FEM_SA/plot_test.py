@@ -770,9 +770,9 @@ def create_all_plots(config: Config,
     ax.set_ylim(y_min - y_margin, y_max + y_margin)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'structure.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'structure.png'), dpi=300, bbox_inches='tight')
+    plt.close() 
     
     # PLOT 2: Deflection Primary
     print("  2. Plotting deflection (primary)...")
@@ -788,8 +788,8 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     ax.text(0.02, 0.98, f'Max Deflection: {max_disp_primary:.4e} m', transform=ax.transAxes, fontsize=10, 
            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_primary.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 3: Deflection Dual
@@ -809,8 +809,8 @@ def create_all_plots(config: Config,
     ax.legend(loc='upper right')
     ax.text(0.02, 0.98, f'Max Deflection: {max_disp_dual:.4e} m', transform=ax.transAxes, fontsize=10, 
            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_dual.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'deflection_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 4: Moment Primary
@@ -829,8 +829,8 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     ax.text(0.02, 0.98, f'Max Moment: {max_moment_primary:.4e} N·m', transform=ax.transAxes, fontsize=10, 
            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'moment_primary.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'moment_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 5: Moment Dual
@@ -851,8 +851,8 @@ def create_all_plots(config: Config,
     ax.legend(loc='upper right')
     ax.text(0.02, 0.98, f'Max Moment: {max_moment_dual:.4e} N·m', transform=ax.transAxes, fontsize=10, 
            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'moment_dual.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'moment_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 6: Rotation Primary
@@ -869,8 +869,8 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     ax.text(0.02, 0.98, f'Max Rotation: {max_rot_primary:.4e} rad', transform=ax.transAxes, fontsize=10, 
            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_primary.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 7: Rotation Dual
@@ -891,8 +891,8 @@ def create_all_plots(config: Config,
     ax.text(0.02, 0.98, f'θ_left: {min_rot_dual:.4f} rad\nθ_right: {max_rot_dual:.4f} rad\nΔθ: {max_rot_dual - min_rot_dual:.4f} rad', 
            transform=ax.transAxes, fontsize=10, verticalalignment='top',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_dual.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'rotation_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 8: Sensitivity
@@ -923,8 +923,8 @@ def create_all_plots(config: Config,
         ax.text(0.02, 0.98, f'Max: {max_sens:.4e}\nMin: {min_sens:.4e}\nTotal: {total_sens:.4e}', 
                transform=ax.transAxes, fontsize=10, verticalalignment='top',
                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-        if config.plotting.save_figures:
-            plt.savefig(os.path.join(config.paths.plots_dir, 'sensitivity.png'), dpi=300, bbox_inches='tight')
+        # if config.plotting.save_figures:
+        #     plt.savefig(os.path.join(config.paths.plots_dir, 'sensitivity.png'), dpi=300, bbox_inches='tight')
         plt.close()
     
     # PLOT 9: Combined Primary
@@ -970,8 +970,8 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'combined_primary.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'combined_primary.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 10: Combined Dual
@@ -1024,8 +1024,8 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    if config.plotting.save_figures:
-        plt.savefig(os.path.join(config.paths.plots_dir, 'combined_dual.png'), dpi=300, bbox_inches='tight')
+    # if config.plotting.save_figures:
+    #     plt.savefig(os.path.join(config.paths.plots_dir, 'combined_dual.png'), dpi=300, bbox_inches='tight')
     plt.close()
     
     # PLOT 11: Combined Sensitivity
@@ -1070,12 +1070,13 @@ def create_all_plots(config: Config,
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        if config.plotting.save_figures:
-            plt.savefig(os.path.join(config.paths.plots_dir, 'combined_sensitivity.png'), dpi=300, bbox_inches='tight')
+        # if config.plotting.save_figures:
+        #     plt.savefig(os.path.join(config.paths.plots_dir, 'combined_sensitivity.png'), dpi=300, bbox_inches='tight')
         plt.close()
     
-    print(f"\n  Plots saved to: {config.paths.plots_dir}")
+    # print(f"\n  Plots saved to: {config.paths.plots_dir}")
     print("=" * 70)
+    plt.show()
 
 
 # =============================================================================

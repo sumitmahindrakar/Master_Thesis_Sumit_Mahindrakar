@@ -451,20 +451,27 @@ if __name__ == "__main__":
 # cp vtk_output/frame_2_example_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_base.vtk
 # cp vtk_output/frame_2_example_vtk/dual/Parts_Beam_Beams_0_1.vtk vtk_dual.vtk
 
-# edit confiig E by 150%
+# cp vtk_output/beam_example_E2100_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_base.vtk
+# cp vtk_output/beam_example_E2100_vtk/dual/Parts_Beam_Beams_0_1.vtk vtk_dual.vtk
+
+# edit confiig E by +1.0 %
 # then copy the forward vtk
 # material:
 #   E: 212100000000.0
 #   I: 0.000005
 # python scripts/FEM_SA/run_analysis.py
-# cp vtk_output/frame_2_example_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_forward.vtk
+# cp vtk_output/frame_2_example_E2121_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_forward.vtk
+
+# cp vtk_output/beam_example_E2121_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_forward.vtk
 
 
-# edit confiig E by 50%
+# edit confiig E by -1.0 %
 # material:
-#   E: 189000000000.0
+#   E: 207900000000.0
 #   I: 0.000005
 # python scripts/FEM_SA/run_analysis.py
-# cp vtk_output/frame_2_example_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_backward.vtk
+# cp vtk_output/frame_2_example_E2079_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_backward.vtk
+
+#cp vtk_output/beam_example_E2079_vtk/primary/Parts_Beam_Beams_0_1.vtk vtk_backward.vtk
 
 # run this scripts

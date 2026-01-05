@@ -903,7 +903,7 @@ def create_all_plots(config: Config,
         total_sens = sum(sensitivity_values.values())
         
         fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-        title = f'Sensitivity Diagram: ∂M/∂(EI)\n(Scale: {scales["sensitivity"]:.2e}x)'
+        title = f'Sensitivity Diagram: ∂M_response/∂(EI)\n(Scale: {scales["sensitivity"]:.2e}x)'
         if total_sensitivity is not None:
             title += f'  |  TOTAL = {total_sensitivity:.4e}'
         ax.set_title(title, fontsize=14, fontweight='bold')
@@ -1032,7 +1032,7 @@ def create_all_plots(config: Config,
     if sensitivity_values:
         print("  11. Plotting combined sensitivity...")
         fig, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=FIGURE_DPI)
-        fig.suptitle('Sensitivity Analysis: ∂M/∂(EI)', fontsize=14, fontweight='bold')
+        fig.suptitle('Sensitivity Analysis: ∂M_response/∂(EI)', fontsize=14, fontweight='bold')
         
         ax = axes[0]
         ax.set_title(f'Primary Moment M(x)\n(Max: {max_moment_primary:.4e} N·m)')
@@ -1059,7 +1059,7 @@ def create_all_plots(config: Config,
         
         ax = axes[2]
         total_sens = sum(sensitivity_values.values())
-        ax.set_title(f'Sensitivity ∂M/∂(EI)\n(Total: {total_sens:.4e})', color='#8B0000', fontweight='bold')
+        ax.set_title(f'Sensitivity ∂M_response/∂(EI)\n(Total: {total_sens:.4e})', color='#8B0000', fontweight='bold')
         plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
         plot_sensitivity_diagram(ax, points_primary, cells_primary, sensitivity_values, scales['sensitivity'],
                                 show_values=True, show_element_ids=show_sens_ids)
