@@ -28,20 +28,20 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
         node_left = model_part.GetNode(11)
         node_right = model_part.GetNode(12)
         
-        print("\n" + "="*60)
-        print("DUAL ANALYSIS: UNIT KINK AT MIDSPAN")
-        print("="*60)
-        print(f"Node 11 (x={node_left.X}): θ = -0.5 rad (prescribed)")
-        print(f"Node 12 (x={node_right.X}): θ = +0.5 rad (prescribed)")
-        print(f"Total kink = 1.0 rad")
-        print("="*60)
+        # print("\n" + "="*60)
+        # print("DUAL ANALYSIS: UNIT KINK AT MIDSPAN")
+        # print("="*60)
+        # print(f"Node 11 (x={node_left.X}): θ = -0.5 rad (prescribed)")
+        # print(f"Node 12 (x={node_right.X}): θ = +0.5 rad (prescribed)")
+        # print(f"Total kink = 1.0 rad")
+        # print("="*60)
         
         # Couple X displacement: u_x(11) = u_x(12)
         model_part.CreateNewMasterSlaveConstraint(
             "LinearMasterSlaveConstraint", 1,
             node_left, KratosMultiphysics.DISPLACEMENT_X,
             node_right, KratosMultiphysics.DISPLACEMENT_X,
-            1.0, 0.0
+            1.0, 0.0 # slave = 1.0 * master + 0.0
         )
         
         # Couple Y displacement: u_y(11) = u_y(12)
@@ -49,7 +49,17 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
             "LinearMasterSlaveConstraint", 2,
             node_left, KratosMultiphysics.DISPLACEMENT_Y,
             node_right, KratosMultiphysics.DISPLACEMENT_Y,
-            1.0, 0.0
+            1.0, 0.0 # slave = 1.0 * master + 0.0
+        )
+
+        # Couple Y displacement: r(11) = r(12)
+        # RELATIVE rotation constraint: θ(12) = θ(11) + 1.0
+        # This means: θ(12) - θ(11) = 1.0 (unit kink)
+        model_part.CreateNewMasterSlaveConstraint(
+            "LinearMasterSlaveConstraint", 3,
+            node_left, KratosMultiphysics.ROTATION_Z,
+            node_right, KratosMultiphysics.ROTATION_Z,
+            1.0, 0.0001 # slave = 1.0 * master + 1.0
         )
         
         print("Hinge displacement coupling applied")
@@ -95,7 +105,8 @@ if __name__ == "__main__":
     
     # Paths
     base_dir = "test_files/SA_beam_2D_udl_kink.gid"
-    json_file = os.path.join(base_dir, "ProjectParameters_dual.json")
+    # json_file = os.path.join(base_dir, "ProjectParameters_dual.json")
+    json_file = os.path.join(base_dir, "ProjectParameters_dual_wo_Hing_constraint.json")
     output_dir = os.path.join(base_dir, "vtk_output_dual")
     
     # Create output directory

@@ -50,6 +50,7 @@ class ResponseConfig:
     y: float
     z: float = 0.0
     response_type: str = "moment"
+    delta_theta: float = 1.0
     
     def as_tuple(self) -> Tuple[float, float, float]:
         return (self.x, self.y, self.z)
@@ -319,7 +320,8 @@ def load_config(config_path: Optional[str] = None) -> Config:
         x=response_raw.get('x', 1.0),
         y=response_raw.get('y', 0.0),
         z=response_raw.get('z', 0.0),
-        response_type=response_raw.get('type', 'moment')
+        response_type=response_raw.get('type', 'moment'),
+        delta_theta=response_raw.get('delta_theta', 1.0)
     )
     
     # Parse material config
@@ -376,6 +378,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
     print(f"  Problem name: {config.problem.name}")
     print(f"  Subdivisions: {config.mesh.subdivisions}")
     print(f"  Response location: ({config.response.x}, {config.response.y})")
+    print(f"  Delta theta:     {config.response.delta_theta}")
     
     return config
 

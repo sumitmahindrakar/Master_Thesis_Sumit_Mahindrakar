@@ -1,7 +1,7 @@
 """
 Sensitivity Analysis Calculator with Export
 ============================================
-Computes ∂M/∂(EI) using the adjoint method and exports results.
+Computes dM/d(EI) using the adjoint method and exports results.
 
 Features:
 - Reads VTK outputs from primary and dual analyses
@@ -11,7 +11,7 @@ Features:
 - Generates all visualization plots
 
 Formula:
-    ∂M_response/∂(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
+    dM_response/d(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
 
 Author: SA Pipeline
 """
@@ -368,11 +368,12 @@ def calculate_geometry(vtk_data: Dict) -> Dict[str, Any]:
 def compute_sensitivities(E: float, I: float,
                           geometry: Dict[str, Any],
                           M_primary: Dict[int, float],
-                          M_dual: Dict[int, float]) -> Tuple[List[ElementSensitivity], float]:
+                          M_dual: Dict[int, float],
+                          delta_theta: float = 1.0) -> Tuple[List[ElementSensitivity], float]:
     """
-    Compute ∂M/∂(EI) for all elements.
+    Compute dM/d(EI) for all elements.
     
-    Formula: ∂M/∂(EI)_k = -(1/(EI)²) × M_k × M̄_k × L_k
+    Formula: dM/d(EI)_k = -(1/(EI)²) × M_k × M̄_k × L_k
     
     Returns
     -------
@@ -392,13 +393,15 @@ def compute_sensitivities(E: float, I: float,
     
     for elem_id in sorted(common_ids):
         M_p = M_primary[elem_id]
-        M_d = M_dual[elem_id]
+        M_d = M_dual[elem_id] / delta_theta
+        # M_d = 1
         elem_info = element_data[elem_id]
         L = elem_info['length']
         
         # Compute integral and sensitivity
         integral = M_p * M_d * L
         dM_dEI = -integral / EI_squared
+    
         
         sens = ElementSensitivity(
             element_id=elem_id,
@@ -597,7 +600,7 @@ def print_results(results: SensitivityResults) -> None:
     """Print formatted results to console."""
     
     print("\n" + "=" * 80)
-    print("SENSITIVITY ANALYSIS RESULTS: ∂M/∂(EI)")
+    print("SENSITIVITY ANALYSIS RESULTS: dM/d(EI)")
     print("=" * 80)
     
     print(f"\nProblem: {results.problem_name} ({results.template})")
@@ -617,7 +620,7 @@ def print_results(results: SensitivityResults) -> None:
     
     print("\n" + "-" * 80)
     print(f"{'Elem':^6} {'Type':^8} {'M_primary':^14} {'M_dual':^14} "
-          f"{'Length':^10} {'∂M/∂(EI)':^18}")
+          f"{'Length':^10} {'dM/d(EI)':^18}")
     print("-" * 80)
     
     for elem in results.elements:
@@ -790,6 +793,10 @@ def compute_sensitivity_analysis(config: Config) -> Optional[SensitivityResults]
         material = load_material_properties(config.paths.input_materials)
         print(f"  From JSON: E={material['E']:.4e}, I={material['I']:.4e}")
     
+    # Get delta_theta for normalization
+    delta_theta = getattr(config.response, 'delta_theta', 1.0)
+    print(f"  Delta theta (kink): {delta_theta} rad")
+    
     # Calculate geometry
     print("\n4. Calculating geometry...")
     geometry = calculate_geometry(vtk_primary)
@@ -800,10 +807,11 @@ def compute_sensitivity_analysis(config: Config) -> Optional[SensitivityResults]
     print("\n5. Computing sensitivities...")
     sensitivities, total = compute_sensitivities(
         material['E'], material['I'],
-        geometry, M_primary, M_dual
+        geometry, M_primary, M_dual,
+        delta_theta
     )
     print(f"  Computed for {len(sensitivities)} elements")
-    print(f"  Total ∂M/∂(EI) = {total:.6e}")
+    print(f"  Total dM/d(EI) = {total:.6e}")
     
     # Assemble results
     print("\n6. Assembling results...")
