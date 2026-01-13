@@ -35,9 +35,9 @@ VTK_FILE_PATH = "test_files/SA_beam_2D_udl_kink.gid/vtk_output_dual/Parts_Beam_B
 # Scale factors for visualization (adjust these to make diagrams visible)
 # DEFLECTION_SCALE = 1000      # Scale factor for deflection diagram
 # MOMENT_SCALE = 0.0005        # Scale factor for bending moment diagram
-DEFLECTION_SCALE = 1      # Scale factor for deflection diagram
-MOMENT_SCALE = 1e-7*2      # Scale factor for bending moment diagram
-ROTATION_SCALE = 1
+DEFLECTION_SCALE = 1000        # Scale factor for deflection diagram
+MOMENT_SCALE = 1e-4*2          # Scale factor for bending moment diagram
+ROTATION_SCALE = 1000
 
 # Colors for plotting
 COLOR_STRUCTURE = 'black'           # Original structure color

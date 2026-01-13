@@ -112,10 +112,12 @@ if KRATOS_AVAILABLE:
         
         def __init__(self, model, project_parameters, 
                      hinge_left: int, hinge_right: int,
+                     delta_theta: float = 1.0,
                      flush_frequency=10.0):
             super().__init__(model, project_parameters)
             self.hinge_left = hinge_left
             self.hinge_right = hinge_right
+            self.delta_theta = delta_theta
             self.flush_frequency = flush_frequency
             self.last_flush = time.time()
             self._mpc_created = False
@@ -148,10 +150,14 @@ if KRATOS_AVAILABLE:
             print("=" * 60)
             print(f"  Hinge left node:  {self.hinge_left} at x={node_left.X:.4f}")
             print(f"  Hinge right node: {self.hinge_right} at x={node_right.X:.4f}")
-            print(f"  Prescribed: θ_left = -0.5 rad, θ_right = +0.5 rad")
-            print(f"  Total kink = 1.0 rad")
+            # print(f"  Prescribed: θ_left = -0.5 rad, θ_right = +0.5 rad")
+            # print(f"  Total kink = 1.0 rad")
+            # print("=" * 60)
+
+            print(f"  Prescribed: θ_left = {-self.delta_theta/2:.4f} rad, θ_right = {+self.delta_theta/2:.4f} rad")
+            print(f"  Total kink = {self.delta_theta} rad")
             print("=" * 60)
-            
+
             # Couple X displacement: u_x(left) = u_x(right)
             model_part.CreateNewMasterSlaveConstraint(
                 "LinearMasterSlaveConstraint", 1,
@@ -166,6 +172,16 @@ if KRATOS_AVAILABLE:
                 node_left, KratosMultiphysics.DISPLACEMENT_Y,
                 node_right, KratosMultiphysics.DISPLACEMENT_Y,
                 1.0, 0.0
+            )
+
+            # Couple rotation: r(11) = r(12)
+            # RELATIVE rotation constraint: θ(12) = θ(11) + 1.0
+            # This means: θ(12) - θ(11) = 1.0 (unit kink)
+            model_part.CreateNewMasterSlaveConstraint(
+                "LinearMasterSlaveConstraint", 3,
+                node_left, KratosMultiphysics.ROTATION_Z,
+                node_right, KratosMultiphysics.ROTATION_Z,
+                1.0, self.delta_theta # slave = 1.0 * master + 1.0 (self.delta_theta)
             )
             
             print("  Hinge displacement coupling applied (MasterSlaveConstraints)")
@@ -209,7 +225,7 @@ if KRATOS_AVAILABLE:
             print(f"  Right node {self.hinge_right}:")
             print(f"    Displacement: ({disp_right[0]:.6e}, {disp_right[1]:.6e})")
             print(f"    Rotation: {rot_right:+.6f} rad")
-            print(f"\n  Kink (Δθ): {rot_right - rot_left:+.6f} rad (should be +1.0)")
+            print(f"\n  Kink (Δθ): {rot_right - rot_left:+.6f} rad (should be {self.delta_theta:+.6f})") 
             
             # Check displacement coupling
             disp_diff_x = abs(disp_left[0] - disp_right[0])
@@ -326,6 +342,11 @@ def run_dual_analysis(config: Config) -> bool:
         print(f"Error: {e}")
         return False
     
+    delta_theta = getattr(config.response, 'delta_theta', 1.0)
+    print(f"  Delta theta: {delta_theta}")
+    print(f"  DEBUG - config.response: {config.response}")  # Debug
+    print(f"  DEBUG - hasattr delta_theta: {hasattr(config.response, 'delta_theta')}")  # Debug
+
     params_path = config.paths.input_params_dual
     
     if not os.path.exists(params_path):
@@ -346,7 +367,7 @@ def run_dual_analysis(config: Config) -> bool:
     # Run analysis
     try:
         model = KratosMultiphysics.Model()
-        analysis = DualAnalysis(model, parameters, hinge_left, hinge_right)
+        analysis = DualAnalysis(model, parameters, hinge_left, hinge_right, delta_theta)
         analysis.Run()
         
         print(f"\n  VTK output: {vtk_dir}")
@@ -469,7 +490,8 @@ def run_dual_standalone(params_path: str, hinge_left: int, hinge_right: int) -> 
     
     try:
         model = KratosMultiphysics.Model()
-        analysis = DualAnalysis(model, parameters, hinge_left, hinge_right)
+        delta_theta = getattr(config.response, 'delta_theta', 1.0)
+        analysis = DualAnalysis(model, parameters, hinge_left, hinge_right, delta_theta)
         analysis.Run()
         return True
     except Exception as e:

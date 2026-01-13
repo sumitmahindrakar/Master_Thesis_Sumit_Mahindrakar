@@ -688,6 +688,46 @@ def plot_sensitivity_diagram(ax, points: np.ndarray, cells: List,
 # MAIN PLOTTING FUNCTION
 # =============================================================================
 
+def get_hinge_rotations(points: np.ndarray, rotation_data: np.ndarray, 
+                        response_location: Tuple[float, float, float],
+                        cells: List) -> Tuple[float, float]:
+    """Get left and right rotations at the hinge location."""
+    tolerance = 1e-4
+    hinge_x, hinge_y = response_location[0], response_location[1]
+    
+    # Find nodes at hinge location
+    hinge_nodes = []
+    for i, point in enumerate(points):
+        if (abs(point[0] - hinge_x) < tolerance and 
+            abs(point[1] - hinge_y) < tolerance):
+            hinge_nodes.append(i)
+    
+    if len(hinge_nodes) < 2:
+        return np.min(rotation_data[:, 2]), np.max(rotation_data[:, 2])
+    
+    # Determine left/right based on connected element positions
+    node_sides = {}
+    for node_idx in hinge_nodes:
+        for cell in cells:
+            if node_idx in cell:
+                other_idx = cell[1] if cell[0] == node_idx else cell[0]
+                other_x = points[other_idx][0]
+                node_sides[node_idx] = 'left' if other_x < hinge_x else 'right'
+                break
+    
+    theta_left, theta_right = None, None
+    for node_idx, side in node_sides.items():
+        if side == 'left':
+            theta_left = rotation_data[node_idx][2]
+        else:
+            theta_right = rotation_data[node_idx][2]
+    
+    if theta_left is None or theta_right is None:
+        rots = [rotation_data[n][2] for n in hinge_nodes]
+        return min(rots), max(rots)
+    
+    return theta_left, theta_right
+
 def create_all_plots(config: Config,
                      vtk_primary: Dict, vtk_dual: Dict,
                      sensitivity_values: Optional[Dict[int, float]] = None,
@@ -755,8 +795,8 @@ def create_all_plots(config: Config,
     max_moment_primary = np.max(np.abs(moment_primary[:, 2]))
     max_moment_dual = np.max(np.abs(moment_dual[:, 2]))
     max_rot_primary = np.max(np.abs(rotation_primary[:, 2]))
-    max_rot_dual = np.max(rotation_dual[:, 2])
-    min_rot_dual = np.min(rotation_dual[:, 2])
+    theta_left_dual, theta_right_dual = get_hinge_rotations(
+    points_dual, rotation_dual, response_location, cells_dual)
     
     # PLOT 1: Structure
     print("\n  1. Plotting structure...")
@@ -888,7 +928,7 @@ def create_all_plots(config: Config,
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
-    ax.text(0.02, 0.98, f'θ_left: {min_rot_dual:.4f} rad\nθ_right: {max_rot_dual:.4f} rad\nΔθ: {max_rot_dual - min_rot_dual:.4f} rad', 
+    ax.text(0.02, 0.98, f'θ_left: {theta_left_dual:.4f} rad\nθ_right: {theta_right_dual:.4f} rad\nΔθ: {theta_left_dual - theta_right_dual:.4f} rad', 
            transform=ax.transAxes, fontsize=10, verticalalignment='top',
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     if config.plotting.save_figures:
@@ -903,7 +943,7 @@ def create_all_plots(config: Config,
         total_sens = sum(sensitivity_values.values())
         
         fig, ax = plt.subplots(figsize=(12, 6), dpi=FIGURE_DPI)
-        title = f'Sensitivity Diagram: ∂M_response/∂(EI)\n(Scale: {scales["sensitivity"]:.2e}x)'
+        title = f'Sensitivity Diagram: dM_response/d(EI)\n(Scale: {scales["sensitivity"]:.2e}x)'
         if total_sensitivity is not None:
             title += f'  |  TOTAL = {total_sensitivity:.4e}'
         ax.set_title(title, fontsize=14, fontweight='bold')
@@ -1013,7 +1053,7 @@ def create_all_plots(config: Config,
     ax.grid(True, alpha=0.3)
     
     ax = axes[1, 1]
-    ax.set_title(f'Rotation (Δθ: {max_rot_dual - min_rot_dual:.4f} rad)')
+    ax.set_title(f'Rotation (Δθ: {theta_right_dual  - theta_left_dual:.4f} rad)')
     plot_structure(ax, points_dual, cells_dual, color='gray', linewidth=1.5)
     plot_rotation_diagram(ax, points_dual, cells_dual, rotation_dual, scales['rotation_dual'],
                          color=COLORS['rotation_dual'], fill_color=COLORS['fill_rotation_dual'])
@@ -1032,7 +1072,7 @@ def create_all_plots(config: Config,
     if sensitivity_values:
         print("  11. Plotting combined sensitivity...")
         fig, axes = plt.subplots(1, 3, figsize=(18, 6), dpi=FIGURE_DPI)
-        fig.suptitle('Sensitivity Analysis: ∂M_response/∂(EI)', fontsize=14, fontweight='bold')
+        fig.suptitle('Sensitivity Analysis: dM_response/d(EI)', fontsize=14, fontweight='bold')
         
         ax = axes[0]
         ax.set_title(f'Primary Moment M(x)\n(Max: {max_moment_primary:.4e} N·m)')
@@ -1059,7 +1099,7 @@ def create_all_plots(config: Config,
         
         ax = axes[2]
         total_sens = sum(sensitivity_values.values())
-        ax.set_title(f'Sensitivity ∂M_response/∂(EI)\n(Total: {total_sens:.4e})', color='#8B0000', fontweight='bold')
+        ax.set_title(f'Sensitivity dM_response/d(EI)\n(Total: {total_sens:.4e})', color='#8B0000', fontweight='bold')
         plot_structure(ax, points_primary, cells_primary, color='gray', linewidth=1.5)
         plot_sensitivity_diagram(ax, points_primary, cells_primary, sensitivity_values, scales['sensitivity'],
                                 show_values=True, show_element_ids=show_sens_ids)

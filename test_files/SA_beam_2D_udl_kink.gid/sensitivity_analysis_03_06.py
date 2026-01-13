@@ -8,7 +8,7 @@ Description:
     adjoint/dual method.
     
 Formula:
-    ∂M_response/∂(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
+    dM_response/d(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
 """
 
 import numpy as np
@@ -26,7 +26,7 @@ FOLDER = os.path.dirname(os.path.abspath(__file__))
 
 # Scale factors for visualization
 PRIMARY_MOMENT_SCALE = 0.0003
-DUAL_MOMENT_SCALE = 0.000001
+DUAL_MOMENT_SCALE = 0.001
 SENSITIVITY_SCALE = 1e4
 
 # Colors
@@ -665,7 +665,9 @@ def compute_moment_sensitivity(E, I, L_elements, M_primary, M_dual):
         L = L_elements.get(eid, 1.0)
         
         integral = M_p * M_d * L
-        dM_dEI = -integral / EI_squared
+        # dM_dEI = -integral / EI_squared 
+        dM_dEI = -integral / EI_squared / 0.0001#57.3 for degree unit kink
+        # only one time scaled cause onlu dual momnt is affected due to kink scaled down value
         
         sensitivities[eid] = {
             'M_primary': M_p,
