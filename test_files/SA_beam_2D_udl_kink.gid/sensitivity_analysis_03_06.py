@@ -1,5 +1,5 @@
 """
-Moment Sensitivity Calculator: ∂M/∂(EI)
+Moment Sensitivity Calculator: dM/d(EI)
 Using General Influence Method with VTK File Parsing and Visualization
 
 Description:
@@ -9,6 +9,7 @@ Description:
     
 Formula:
     dM_response/d(EI)_k = -(1/(EI)²) × ∫ M_k(x) × M̄_k(x) dx
+    - constant Moment is assumed per element as per Kratos result
 """
 
 import numpy as np
@@ -20,14 +21,10 @@ import matplotlib.patches as mpatches
 
 FOLDER = os.path.dirname(os.path.abspath(__file__))
 
-# =============================================================================
-# CONFIGURATION
-# =============================================================================
-
 # Scale factors for visualization
 PRIMARY_MOMENT_SCALE = 0.0003
-DUAL_MOMENT_SCALE = 0.001
-SENSITIVITY_SCALE = 1e4
+DUAL_MOMENT_SCALE = 1e-7*5
+SENSITIVITY_SCALE = 1e3*5
 
 # Colors
 COLOR_STRUCTURE = 'black'
@@ -48,9 +45,6 @@ SAVE_FIGURES = True
 OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"
 
 
-# =============================================================================
-# JSON PARSER FOR MATERIAL PROPERTIES
-# =============================================================================
 
 def load_material_properties(json_path, model_part_name=None):
     """
@@ -171,10 +165,6 @@ def find_material_json(vtk_path):
     
     return None
 
-
-# =============================================================================
-# VTK FILE PARSER
-# =============================================================================
 
 def parse_vtk_file(filename):
     """Parse a VTK file and extract points, cells, and field data."""
@@ -352,10 +342,6 @@ def parse_vtk_cell_moments(vtk_file_path):
     
     return moments
 
-
-# =============================================================================
-# GEOMETRY UTILITIES
-# =============================================================================
 
 def get_element_direction(p1, p2):
     """Get the unit direction vector of an element."""
@@ -650,7 +636,7 @@ def plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivity_values,
 # =============================================================================
 
 def compute_moment_sensitivity(E, I, L_elements, M_primary, M_dual):
-    """Compute ∂M/∂(EI) for all elements using the adjoint method."""
+    """Compute dM/d(EI) for all elements using the adjoint method."""
     EI = E * I
     EI_squared = EI ** 2
     
@@ -666,8 +652,8 @@ def compute_moment_sensitivity(E, I, L_elements, M_primary, M_dual):
         
         integral = M_p * M_d * L
         # dM_dEI = -integral / EI_squared 
-        dM_dEI = -integral / EI_squared / 0.0001#57.3 for degree unit kink
-        # only one time scaled cause onlu dual momnt is affected due to kink scaled down value
+        dM_dEI = -integral / EI_squared #57.3 for degree unit kink (must scaled if scaled kink is used)
+        # only one time scaled because onlu dual momnt is affected - due to kink scaled down value
         
         sensitivities[eid] = {
             'M_primary': M_p,
@@ -687,7 +673,7 @@ def print_results(E, I, sensitivities, total_sensitivity, geometry_info, respons
     EI = E * I
     
     print("\n" + "=" * 75)
-    print("MOMENT SENSITIVITY ANALYSIS: ∂M/∂(EI)")
+    print("MOMENT SENSITIVITY ANALYSIS: dM/d(EI)")
     print("Using General Influence (Adjoint) Method")
     print("=" * 75)
     
@@ -706,7 +692,7 @@ def print_results(E, I, sensitivities, total_sensitivity, geometry_info, respons
     
     print("\n" + "-" * 75)
     print(f"{'Elem k':^8} {'M_k [N·m]':^14} {'M̄_k [N·m]':^14} "
-          f"{'L_k [m]':^10} {'∂M/∂(EI)_k':^20}")
+          f"{'L_k [m]':^10} {'dM/d(EI)_k':^20}")
     print("-" * 75)
     
     for eid, data in sorted(sensitivities.items()):
@@ -836,7 +822,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     # =========================================================================
     
     fig3, ax = plt.subplots(figsize=(14, 6), dpi=FIGURE_DPI)
-    ax.set_title('Sensitivity Diagram: ∂M/∂(EI)\n[How Response Moment Changes with Element Stiffness]', 
+    ax.set_title('Sensitivity Diagram: dM/d(EI)\n[How Response Moment Changes with Element Stiffness]', 
                  fontsize=14, fontweight='bold')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5,
                   show_element_labels=True)
@@ -872,7 +858,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
                 f'Max: {max_sens:.4e}\n'
                 f'Min: {min_sens:.4e}\n'
                 f'─────────────────\n'
-                f'TOTAL ∂M/∂(EI):\n'
+                f'TOTAL dM/d(EI):\n'
                 f'{total_sensitivity:.4e}')
     
     ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=9,
@@ -880,7 +866,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.9, edgecolor='black'))
     
     # Prominent total sensitivity annotation at bottom center
-    ax.text(0.5, 0.02, f'Σ ∂M/∂(EI) = {total_sensitivity:.6e}', 
+    ax.text(0.5, 0.02, f'Σ dM/d(EI) = {total_sensitivity:.6e}', 
            transform=ax.transAxes, fontsize=12, fontweight='bold',
            ha='center', va='bottom',
            bbox=dict(boxstyle='round,pad=0.5', facecolor='#FFD700', alpha=0.9, 
@@ -934,7 +920,7 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
     
     # Sensitivity
     ax = axes[2]
-    ax.set_title(f'Sensitivity ∂M/∂(EI)  |  TOTAL = {total_sensitivity:.4e}', 
+    ax.set_title(f'Sensitivity dM/d(EI)  |  TOTAL = {total_sensitivity:.4e}', 
                 fontsize=12, fontweight='bold', color='#8B0000')
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     plot_sensitivity_diagram_on_structure(ax, points, cells, sensitivities,
@@ -971,39 +957,9 @@ def create_sensitivity_visualization(vtk_primary, vtk_dual, E, I,
 def main(primary_vtk_path, dual_vtk_path, material_json_path=None,
          E=None, I=None, response_element=None, 
          create_plots=True, save_plots=True, output_dir="."):
-    """
-    Main function - compute sensitivity from VTK files with visualization.
-    
-    Material properties and geometry are automatically extracted from files.
-    
-    Parameters:
-    -----------
-    primary_vtk_path : str
-        Path to primary analysis VTK file
-    dual_vtk_path : str
-        Path to dual analysis VTK file
-    material_json_path : str, optional
-        Path to StructuralMaterials.json. If None, will search automatically.
-    E : float, optional
-        Young's modulus override (if not using JSON)
-    I : float, optional
-        Second moment of area override (if not using JSON)
-    response_element : int, optional
-        Response element ID for labeling
-    create_plots : bool
-        Whether to create plots
-    save_plots : bool
-        Whether to save plots
-    output_dir : str
-        Output directory for plots
-        
-    Returns:
-    --------
-    tuple : (sensitivities dict, total sensitivity)
-    """
     
     print("=" * 75)
-    print("MOMENT SENSITIVITY ANALYSIS: ∂M/∂(EI)")
+    print("MOMENT SENSITIVITY ANALYSIS: dM/d(EI)")
     print("Using Adjoint Method with VTK File Parsing")
     print("=" * 75)
     

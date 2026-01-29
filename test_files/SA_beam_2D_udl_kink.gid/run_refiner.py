@@ -1,12 +1,5 @@
-"""
-Simple runner script for MDPA mesh refinement
-Run this file directly in VS Code (F5 or Run button)
-"""
-
 from mdpa_refiner import parse_mdpa, refine_mesh, write_mdpa
 
-# ============== CONFIGURATION ==============
-# Change these parameters as needed
 
 INPUT_FILE = "test_files/SA_beam_2D_udl_kink.gid/SA_beam_2D_udl.mdpa"      # Input file name
 OUTPUT_FILE = "test_files/SA_beam_2D_udl_kink.gid/SA_beam_2D_udl_refined.mdpa"  # Output file name

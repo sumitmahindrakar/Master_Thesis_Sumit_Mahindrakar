@@ -1,43 +1,17 @@
-"""
-VTK Frame Structure Plotter
-===========================
-This script reads a VTK file containing frame structure data and plots:
-1. The original frame structure
-2. Deflection diagram (perpendicular to elements)
-3. Bending moment diagram (perpendicular to elements)
-
-Usage:
-------
-1. Set the VTK_FILE_PATH variable to your file path
-2. Run the script
-
-Author: Your Name
-Date: 2024
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import os
 import sys
 
-# =============================================================================
-# USER INPUT - SET YOUR VTK FILE PATH HERE
-# =============================================================================
+VTK_FILE_PATH = "test_files/SA_beam_2D_udl_kink.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"
 
-VTK_FILE_PATH = "test_files/SA_beam_2D_udl_kink.gid/vtk_output/Parts_Beam_Beams_0_1.vtk"  # <-- Change this to current VTK file path
-# VTK_FILE_PATH = "test_files/SA_beam_2D_udl_kink.gid/vtk_output_dual/Parts_Beam_Beams_0_1.vtk"
-
-# =============================================================================
-# CONFIGURATION - Easy to modify parameters
-# =============================================================================
-
-# Scale factors for visualization (adjust these to make diagrams visible)
-DEFLECTION_SCALE = 1000      # Scale factor for deflection diagram
-MOMENT_SCALE = 0.0005        # Scale factor for bending moment diagram
+# Scale factors for visualization
+# DEFLECTION_SCALE = 1000      # Scale factor for deflection diagram
+# MOMENT_SCALE = 0.0005        # Scale factor for bending moment diagram
+DEFLECTION_SCALE = 1000        # Scale factor for deflection diagram
+MOMENT_SCALE = 1e-4*2          # Scale factor for bending moment diagram
 ROTATION_SCALE = 1000
-# DEFLECTION_SCALE = 1      # Scale factor for deflection diagram
-# MOMENT_SCALE = 1e-7       # Scale factor for bending moment diagram
 
 # Colors for plotting
 COLOR_STRUCTURE = 'black'           # Original structure color
@@ -52,13 +26,8 @@ LINEWIDTH_DIAGRAM = 1.5
 
 # Figure settings
 FIGURE_DPI = 100
-SAVE_FIGURES = True          # Set to True to save figures as PNG
-OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"     # Folder to save output figures
-# OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots_dual"
-
-# =============================================================================
-# VTK FILE PARSER
-# =============================================================================
+SAVE_FIGURES = True          
+OUTPUT_FOLDER = "test_files/SA_beam_2D_udl_kink.gid/plots"
 
 def parse_vtk_file(filename):
     """
@@ -215,7 +184,7 @@ def parse_vtk_file(filename):
                     field_name = parts[0]
                     num_components = int(parts[1])
                     num_tuples = int(parts[2])
-                    # parts[3] is the data type (float, int, etc.)
+                    
                     
                     field_data = []
                     i += 1
@@ -250,10 +219,6 @@ def parse_vtk_file(filename):
     
     return data
 
-
-# =============================================================================
-# GEOMETRY UTILITIES
-# =============================================================================
 
 def get_element_direction(p1, p2):
     """
@@ -299,7 +264,6 @@ def get_perpendicular_direction(p1, p2):
     numpy.ndarray : Unit perpendicular vector (rotated 90° counterclockwise)
     """
     direction = get_element_direction(p1, p2)
-    # Rotate 90 degrees counterclockwise in 2D: (x, y) -> (-y, x)
     perpendicular = np.array([-direction[1], direction[0], 0])
     return perpendicular
 
@@ -333,10 +297,6 @@ def get_element_type(p1, p2):
     else:
         return 'inclined'
 
-
-# =============================================================================
-# PLOTTING FUNCTIONS
-# =============================================================================
 
 def plot_structure(ax, points, cells, color=COLOR_STRUCTURE, 
                    linewidth=LINEWIDTH_STRUCTURE, label='Structure',
@@ -692,10 +652,6 @@ def add_supports_r(ax, points, support_indices=None):
             ax.plot([x, x + size*0.3], [hy, hy - size*0.3], 'k', lw=0.8)
 
 
-# =============================================================================
-# MAIN PLOTTING FUNCTION
-# =============================================================================
-
 def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES, 
                        output_folder=OUTPUT_FOLDER):
     """
@@ -886,7 +842,7 @@ def create_frame_plots(vtk_data, save_figures=SAVE_FIGURES,
     plot_structure(ax, points, cells, color='gray', linewidth=1.5)
     add_supports_l(ax, points, support_indices=left_supports)
     add_supports_r(ax, points, support_indices=right_supports)
-    plot_rotation_diagram(ax, points, cells, rotation, scale=1000.0)
+    plot_rotation_diagram(ax, points, cells, rotation, scale=ROTATION_SCALE)
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
 
@@ -949,17 +905,12 @@ if __name__ == "__main__":
     print("VTK FRAME STRUCTURE PLOTTER")
     print("=" * 60)
     
-    # -------------------------------------------------------------------------
-    # Option 1: Use command line argument
-    # -------------------------------------------------------------------------
     if len(sys.argv) > 1:
         vtk_file = sys.argv[1]
     else:
         vtk_file = VTK_FILE_PATH
     
-    # -------------------------------------------------------------------------
     # Parse the VTK file
-    # -------------------------------------------------------------------------
     try:
         print(f"\n1. Loading VTK file: {vtk_file}")
         vtk_data = parse_vtk_file(vtk_file)

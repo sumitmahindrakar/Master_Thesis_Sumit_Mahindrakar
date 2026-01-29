@@ -1,8 +1,3 @@
-"""
-Dual Analysis for Sensitivity: Unit Kink at Midspan
-Fixed-Fixed Beam with prescribed rotations θ₃=-0.5, θ₄=+0.5 (total kink = 1.0)
-"""
-
 import os
 import KratosMultiphysics
 from KratosMultiphysics.StructuralMechanicsApplication.structural_mechanics_analysis import StructuralMechanicsAnalysis
@@ -28,14 +23,6 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
         node_left = model_part.GetNode(11)
         node_right = model_part.GetNode(12)
         
-        # print("\n" + "="*60)
-        # print("DUAL ANALYSIS: UNIT KINK AT MIDSPAN")
-        # print("="*60)
-        # print(f"Node 11 (x={node_left.X}): θ = -0.5 rad (prescribed)")
-        # print(f"Node 12 (x={node_right.X}): θ = +0.5 rad (prescribed)")
-        # print(f"Total kink = 1.0 rad")
-        # print("="*60)
-        
         # Couple X displacement: u_x(11) = u_x(12)
         model_part.CreateNewMasterSlaveConstraint(
             "LinearMasterSlaveConstraint", 1,
@@ -52,14 +39,14 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
             1.0, 0.0 # slave = 1.0 * master + 0.0
         )
 
-        # Couple Y displacement: r(11) = r(12)
+        # Couple Z rotation: θ(11) = θ(12)
         # RELATIVE rotation constraint: θ(12) = θ(11) + 1.0
         # This means: θ(12) - θ(11) = 1.0 (unit kink)
         model_part.CreateNewMasterSlaveConstraint(
             "LinearMasterSlaveConstraint", 3,
             node_left, KratosMultiphysics.ROTATION_Z,
             node_right, KratosMultiphysics.ROTATION_Z,
-            1.0, 0.0001 # slave = 1.0 * master + 1.0
+            1.0, 1.0 # slave = 1.0 * master + 1.0
         )
         
         print("Hinge displacement coupling applied")
@@ -73,20 +60,20 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
         """Print final results."""
         model_part = self.model["Structure"]
         
-        print("\n" + "="*60)
-        print("DUAL ANALYSIS RESULTS")
-        print("="*60)
+        # print("\n" + "="*60)
+        # print("DUAL ANALYSIS RESULTS")
+        # print("="*60)
         
         # Nodal results
-        print("\nNODAL RESULTS:")
-        print("-"*60)
-        print(f"{'Node':<6}{'X':<8}{'Disp_Y':<16}{'Rot_Z':<16}")
-        print("-"*60)
+        # print("\nNODAL RESULTS:")
+        # print("-"*60)
+        # print(f"{'Node':<6}{'X':<8}{'Disp_Y':<16}{'Rot_Z':<16}")
+        # print("-"*60)
         
-        for node in model_part.Nodes:
-            disp = node.GetSolutionStepValue(KratosMultiphysics.DISPLACEMENT)
-            rot = node.GetSolutionStepValue(KratosMultiphysics.ROTATION)
-            print(f"{node.Id:<6}{node.X:<8.2f}{disp[1]:>+16.6e}{rot[2]:>+16.6e}")
+        # for node in model_part.Nodes:
+        #     disp = node.GetSolutionStepValue(KratosMultiphysics.DISPLACEMENT)
+        #     rot = node.GetSolutionStepValue(KratosMultiphysics.ROTATION)
+        #     print(f"{node.Id:<6}{node.X:<8.2f}{disp[1]:>+16.6e}{rot[2]:>+16.6e}")
         
         # Kink verification
         rot_11 = model_part.GetNode(11).GetSolutionStepValue(KratosMultiphysics.ROTATION)[2]
@@ -94,8 +81,8 @@ class DualKinkAnalysis(StructuralMechanicsAnalysis):
         
         print("-"*60)
         print(f"\nKINK VERIFICATION:")
-        print(f"  θ₃ = {rot_11:+.6f} rad")
-        print(f"  θ₄ = {rot_12:+.6f} rad")
+        print(f"  θ_left = {rot_11:+.6f} rad")
+        print(f"  θ_right = {rot_12:+.6f} rad")
         print(f"  Δθ = {rot_12 - rot_11:+.6f} rad (should be +1.0)")
         
         print("-"*60)
