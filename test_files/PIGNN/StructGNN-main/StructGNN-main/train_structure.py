@@ -21,6 +21,24 @@ import os
 import json
 
 
+# ============================================================
+# SET WORKING DIRECTORY TO SCRIPT LOCATION
+# ============================================================
+import os
+import sys
+
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Change to the script directory
+os.chdir(SCRIPT_DIR)
+
+# Add script directory to Python path
+sys.path.insert(0, SCRIPT_DIR)
+
+print(f"Working directory: {os.getcwd()}")
+# ============================================================
+
 
 space = plot.print_space()
 
