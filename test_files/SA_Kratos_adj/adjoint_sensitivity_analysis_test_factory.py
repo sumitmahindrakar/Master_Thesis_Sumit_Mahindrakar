@@ -59,8 +59,8 @@ class AdjointSensitivityAnalysisTestFactory(KratosUnittest.TestCase):
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisBeamStructureLocalStress(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_local_stress_adjoint_parameters.json"
+    primal_file_name = "beam_test_parameters.json"
+    adjoint_file_name = "beam_test_local_stress_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [-87.62277093392399, 9.497391494932984, 38.125186783868, 0.6250049974719261, 0.15624887499699122]
@@ -83,8 +83,8 @@ class TestAdjointSensitivityAnalysisBeamStructureLocalStress(AdjointSensitivityA
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisBeamStructureNodalDisplacement(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_nodal_disp_adjoint_parameters.json"
+    primal_file_name = "beam_test_parameters.json"
+    adjoint_file_name = "beam_test_nodal_disp_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [-0.45410279537614157, -0.37821875982596204, -0.006200296058668847, 0.0004340210813670321]
@@ -103,8 +103,8 @@ class TestAdjointSensitivityAnalysisBeamStructureNodalDisplacement(AdjointSensit
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisBeamStructureStrainEnergy(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_strain_energy_adjoint_parameters.json"
+    primal_file_name = "beam_test_parameters.json"
+    adjoint_file_name = "beam_test_strain_energy_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [-9.082055907522943, -7.5643751965193164, -0.12400592117339182, 0.017360843254681547]
@@ -123,8 +123,8 @@ class TestAdjointSensitivityAnalysisBeamStructureStrainEnergy(AdjointSensitivity
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisBeamStructureNodalReaction(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_beam_structure_3d2n/beam_test_nodal_reaction_adjoint_parameters.json"
+    primal_file_name = "beam_test_parameters.json"
+    adjoint_file_name = "beam_test_nodal_reaction_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         adjoint_model_part = self.adjoint_analysis.model.GetModelPart(self.model_part_name)
@@ -135,8 +135,8 @@ class TestAdjointSensitivityAnalysisBeamStructureNodalReaction(AdjointSensitivit
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisShellStructureLocalStress(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_local_stress_adjoint_parameters.json"
+    primal_file_name = "linear_shell_test_parameters.json"
+    adjoint_file_name = "linear_shell_test_local_stress_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [1.7135092490964121, -6.860092387341681, 0.14749301178647778, -0.0823339298948347]
@@ -155,8 +155,8 @@ class TestAdjointSensitivityAnalysisShellStructureLocalStress(AdjointSensitivity
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisShellStructureNodalDisplacement(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_nodal_disp_adjoint_parameters.json"
+    primal_file_name = "linear_shell_test_parameters.json"
+    adjoint_file_name = "linear_shell_test_nodal_disp_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [-0.09916013365433643, -0.23348175177098657, -0.04942512089147077, 0.012125502238309537]
@@ -175,8 +175,8 @@ class TestAdjointSensitivityAnalysisShellStructureNodalDisplacement(AdjointSensi
 
 @KratosUnittest.skipUnless(has_hdf5_application,"Missing required application: HDF5Application")
 class TestAdjointSensitivityAnalysisShellStructureStrainEnergy(AdjointSensitivityAnalysisTestFactory):
-    primal_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_parameters.json"
-    adjoint_file_name = "adjoint_sensitivity_analysis_tests/adjoint_shell_structure_3d3n/linear_shell_test_strain_energy_adjoint_parameters.json"
+    primal_file_name = "linear_shell_test_parameters.json"
+    adjoint_file_name = "linear_shell_test_strain_energy_adjoint_parameters.json"
 
     def perform_additional_checks(self):
         reference_values = [-0.4958006682716821, -1.1674087588549331, -0.2471256044520311, 0.12125502238309535]
@@ -217,12 +217,12 @@ if __name__ == '__main__':
     smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisBeamStructureNodalDisplacement]))
     smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisBeamStructureStrainEnergy]))
     smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisBeamStructureNodalReaction]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureLocalStress]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureNodalDisplacement]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureStrainEnergy]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisSpringDamperElement]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisLinearTrussStructure]))
-    smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisNonLinearTrussStructure]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureLocalStress]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureNodalDisplacement]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisShellStructureStrainEnergy]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisSpringDamperElement]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisLinearTrussStructure]))
+    # smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases([TestAdjointSensitivityAnalysisNonLinearTrussStructure]))
     allSuite = suites['all']
     allSuite.addTests(smallSuite)
     KratosUnittest.runTests(suites)

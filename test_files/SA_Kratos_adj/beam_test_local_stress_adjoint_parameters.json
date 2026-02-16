@@ -30,8 +30,8 @@
         "sensitivity_settings": {
             "sensitivity_model_part_name": "sensitivity_mp",
             "nodal_solution_step_sensitivity_variables": ["SHAPE_SENSITIVITY"],
-            "element_data_value_sensitivity_variables": ["I22", "YOUNG_MODULUS"],
-            "condition_data_value_sensitivity_variables": ["LINE_LOAD"],
+            "element_data_value_sensitivity_variables": ["I22"],
+            "condition_data_value_sensitivity_variables": ["POINT_LOAD"],
             "build_mode": "static"
         },
         "echo_level": 0,
@@ -49,8 +49,6 @@
             {
                 "python_module": "assign_vector_variable_process",
                 "kratos_module": "KratosMultiphysics",
-                "help": "This process fixes the selected components of a given vector variable",
-                "process_name": "AssignVectorVariableProcess",
                 "Parameters": {
                     "model_part_name": "Structure.DISPLACEMENT_support",
                     "variable_name": "ADJOINT_DISPLACEMENT",
@@ -62,8 +60,6 @@
             {
                 "python_module": "assign_vector_variable_process",
                 "kratos_module": "KratosMultiphysics",
-                "help": "This process fixes the selected components of a given vector variable",
-                "process_name": "AssignVectorVariableProcess",
                 "Parameters": {
                     "model_part_name": "Structure.ROTATION_support",
                     "variable_name": "ADJOINT_ROTATION",
@@ -75,30 +71,37 @@
         ],
         "loads_process_list": [
             {
-                "python_module": "assign_vector_by_direction_to_condition_process",
+                "python_module": "process_factory",
                 "kratos_module": "KratosMultiphysics",
-                "check": "DirectorVectorNonZero direction",
-                "process_name": "AssignVectorByDirectionToConditionProcess",
+                "process_name": "ApplyConstantVectorValueProcess",
                 "Parameters": {
-                    "model_part_name": "Structure.LineLoad3D_load",
-                    "variable_name": "LINE_LOAD",
-                    "modulus": 10.0,
-                    "direction": [0.0, -1.0, 0.0],
-                    "interval": [0.0, "End"]
+                    "model_part_name": "Structure.PointLoad3D_load",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 40,
+                    "direction": [0.0, 0.0, 1.0]
                 }
             }
         ],
         "list_other_processes": [
             {
+                "kratos_module": "KratosMultiphysics.HDF5Application",
+                "python_module": "single_mesh_temporal_input_process",
+                "Parameters": {
+                    "model_part_name": "Structure",
+                    "file_settings": {
+                        "file_access_mode": "read_only"
+                    },
+                    "nodal_solution_step_data_settings": {
+                        "list_of_variables": ["DISPLACEMENT", "ROTATION"]
+                    }
+                }
+            },
+            {
                 "python_module": "element_sensitivity_domain_integration_process",
                 "kratos_module": "KratosMultiphysics.StructuralMechanicsApplication",
-                "help": "",
                 "process_name": "ElementSensitivityDomainIntegrationProcess",
                 "Parameters": {
-                    "element_sensitivity_variables": [
-                        "I22_SENSITIVITY",
-                        "YOUNG_MODULUS_SENSITIVITY"
-                    ],
+                    "element_sensitivity_variables": ["I22_SENSITIVITY"],
                     "model_part_name": "Structure",
                     "sensitivity_model_part_name": "sensitivity_mp",
                     "sensitivity_sub_model_part_list": ["sensitivity_mp_1"]
@@ -111,21 +114,25 @@
             {
                 "python_module": "vtk_output_process",
                 "kratos_module": "KratosMultiphysics",
-                "process_name": "VtkOutputProcess",
                 "Parameters": {
                     "model_part_name": "Structure",
-                    "output_sub_model_parts": false,
-                    "output_path": "vtk_output_adj",
+                    "output_path": "vtk_output_adjoint",
                     "file_format": "ascii",
-                    "output_interval": 1.0,
+                    "output_precision": 7,
+                    "output_control_type": "step",
+                    "output_interval": 1,
                     "nodal_solution_step_data_variables": [
                         "ADJOINT_DISPLACEMENT",
-                        "ADJOINT_ROTATION",
+                        "ADJOINT_ROTATION"
+                    ],
+                    "nodal_data_value_variables": [
                         "SHAPE_SENSITIVITY"
                     ],
                     "element_data_value_variables": [
-                        "I22_SENSITIVITY",
-                        "YOUNG_MODULUS_SENSITIVITY"
+                        "I22_SENSITIVITY"
+                    ],
+                    "condition_data_value_variables": [
+                        "POINT_LOAD_SENSITIVITY"
                     ]
                 }
             }
