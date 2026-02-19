@@ -14,6 +14,95 @@ from structural_mechanics_test_factory import SelectAndVerifyLinearSolver
 has_hdf5_application = kratos_utilities.CheckIfApplicationsAvailable("HDF5Application")
 
 
+# ============================================================
+# CHANGE 1: Add this class
+# ============================================================
+class CustomPrimalAnalysis(structural_mechanics_analysis.StructuralMechanicsAnalysis):
+    """Custom analysis that transfers condition loads to nodes for VTK output."""
+    
+    def FinalizeSolutionStep(self):
+        """Transfer loads AFTER they are applied, BEFORE VTK writes."""
+        
+        mp = self.model.GetModelPart("Structure")
+        LINE_LOAD = StructuralMechanicsApplication.LINE_LOAD
+        POINT_LOAD = StructuralMechanicsApplication.POINT_LOAD
+        POINT_MOMENT = StructuralMechanicsApplication.POINT_MOMENT  # Added POINT_MOMENT
+        
+        # Initialize all nodes to zero
+        zero = KratosMultiphysics.Array3([0.0, 0.0, 0.0])
+        for node in mp.Nodes:
+            node.SetValue(LINE_LOAD, zero)
+            node.SetValue(POINT_LOAD, zero)
+            node.SetValue(POINT_MOMENT, zero)  # Initialize POINT_MOMENT
+        
+        # Transfer LINE_LOAD from conditions to nodes
+        try:
+            load_mp = mp.GetSubModelPart("LineLoad3D_load")
+            for condition in load_mp.Conditions:
+                load_val = condition.GetValue(LINE_LOAD)
+                for node in condition.GetGeometry():
+                    node.SetValue(LINE_LOAD, load_val)
+            print(f"Transferred LINE_LOAD to {load_mp.NumberOfNodes()} nodes")
+        except:
+            pass
+        
+        # Transfer POINT_LOAD from conditions to nodes
+        try:
+            load_mp = mp.GetSubModelPart("PointLoad3D_load")
+            for condition in load_mp.Conditions:
+                load_val = condition.GetValue(POINT_LOAD)
+                for node in condition.GetGeometry():
+                    node.SetValue(POINT_LOAD, load_val)
+            print(f"Transferred POINT_LOAD to {load_mp.NumberOfNodes()} nodes")
+        except:
+            pass
+        
+        # Transfer POINT_MOMENT from conditions to nodes
+        # Try different possible sub-model part names
+        moment_submodelpart_names = [
+            "PointMoment3D_moment",
+            "PointMoment3D_load", 
+            "PointMoment3D",
+            "Moment3D_moment",
+            "PointMoment"
+        ]
+        
+        moment_transferred = False
+        for submp_name in moment_submodelpart_names:
+            try:
+                moment_mp = mp.GetSubModelPart(submp_name)
+                for condition in moment_mp.Conditions:
+                    moment_val = condition.GetValue(POINT_MOMENT)
+                    for node in condition.GetGeometry():
+                        node.SetValue(POINT_MOMENT, moment_val)
+                print(f"Transferred POINT_MOMENT to {moment_mp.NumberOfNodes()} nodes (from {submp_name})")
+                moment_transferred = True
+                break
+            except:
+                continue
+        
+        # Alternative: Search all conditions for POINT_MOMENT if no specific submodelpart found
+        if not moment_transferred:
+            try:
+                moment_count = 0
+                for condition in mp.Conditions:
+                    if condition.Has(POINT_MOMENT):
+                        moment_val = condition.GetValue(POINT_MOMENT)
+                        # Check if it's non-zero
+                        if abs(moment_val[0]) > 1e-12 or abs(moment_val[1]) > 1e-12 or abs(moment_val[2]) > 1e-12:
+                            for node in condition.GetGeometry():
+                                node.SetValue(POINT_MOMENT, moment_val)
+                                moment_count += 1
+                if moment_count > 0:
+                    print(f"Transferred POINT_MOMENT to {moment_count} nodes (from all conditions)")
+            except Exception as e:
+                print(f"Note: No POINT_MOMENT conditions found or error: {e}")
+        
+        # Call parent AFTER transfer (this triggers VTK output)
+        super().FinalizeSolutionStep()
+# ============================================================
+
+
 class AdjointSensitivityAnalysisTestFactory(KratosUnittest.TestCase):
     def setUp(self):
         with KratosUnittest.WorkFolderScope(".", __file__):
@@ -33,10 +122,42 @@ class AdjointSensitivityAnalysisTestFactory(KratosUnittest.TestCase):
             SelectAndVerifyLinearSolver(self.adjoint_parameters, self.skipTest)
 
             model_primal = KratosMultiphysics.Model()
-            primal_analysis = structural_mechanics_analysis.StructuralMechanicsAnalysis(
-                model_primal, primal_parameters)
-            primal_analysis.Run()
 
+            # ============================================================
+            # CHANGE 2: Use CustomPrimalAnalysis instead of default
+            # ============================================================
+            primal_analysis = CustomPrimalAnalysis(
+                model_primal, primal_parameters)
+
+            # Initialize
+            primal_analysis.Initialize()
+
+            # Get model part
+            _mp = model_primal.GetModelPart(self.model_part_name)
+
+            # Transfer material properties to elements
+            _vars = [
+                KratosMultiphysics.YOUNG_MODULUS,
+                KratosMultiphysics.DENSITY,
+                KratosMultiphysics.POISSON_RATIO,
+                StructuralMechanicsApplication.CROSS_AREA,
+                StructuralMechanicsApplication.TORSIONAL_INERTIA,
+                StructuralMechanicsApplication.I22,
+                StructuralMechanicsApplication.I33,
+            ]
+            for element in _mp.Elements:
+                props = element.Properties
+                for var in _vars:
+                    if props.Has(var):
+                        element.SetValue(var, props[var])
+
+            # NO manual load transfer needed — CustomPrimalAnalysis handles it!
+
+            # Run solution
+            primal_analysis.RunSolutionLoop()
+            primal_analysis.Finalize()
+
+            # Adjoint setup
             model_adjoint = KratosMultiphysics.Model()
             self.adjoint_analysis = structural_mechanics_analysis.StructuralMechanicsAnalysis(
                 model_adjoint, self.adjoint_parameters)

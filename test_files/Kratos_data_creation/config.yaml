@@ -1,0 +1,96 @@
+# ============================================================
+# PARAMETRIC STUDY CONFIGURATION
+# ============================================================
+
+# General settings
+general:
+  num_cases: 5                          # Number of random cases to run
+  random_seed: 42                        # For reproducibility (null for random)
+  working_directory: "E:/Master_Thesis_Sumit_Mahindrakar/test_files/Kratos_data_creation"
+  
+# Output settings
+output:
+  primal_folder: "primal"
+  adjoint_folder: "adjoint"
+  primal_prefix: "case_primal"
+  adjoint_prefix: "case_adjoint"
+  save_config_per_case: true             # Save config snapshot for each case
+
+# Template files (relative to working_directory)
+templates:
+  mdpa: "templates/Frame_structure_template.mdpa"
+  primal_json: "templates/primal_parameters_template.json"
+  adjoint_json: "templates/adjoint_parameters_template.json"
+  materials_json: "templates/materials_template.json"
+
+# ============================================================
+# PARAMETER RANGES FOR SAMPLING
+# ============================================================
+
+parameters:
+  # Uniformly Distributed Load (LINE_LOAD modulus)
+  udl:
+    min: 20.0
+    max: 100.0
+    distribution: "uniform"              # uniform, normal, loguniform
+    
+  # Young's Modulus
+  youngs_modulus:
+    min: 1.0e10
+    max: 2.5e11
+    distribution: "loguniform"
+    
+  # Second Moment of Area I22
+  I22:
+    min: 1.0e-5
+    max: 1.0e-3
+    distribution: "loguniform"
+    
+  # Second Moment of Area I33
+  I33:
+    min: 1.0e-5
+    max: 1.0e-5
+    distribution: "loguniform"
+    
+  # Cross-sectional area
+  cross_area:
+    min: 0.01
+    max: 0.1
+    distribution: "uniform"
+    
+  # Torsional inertia
+  torsional_inertia:
+    min: 1.0e-6
+    max: 1.0e-4
+    distribution: "loguniform"
+    
+  # Mesh refinement (subdivisions per element)
+  subdivisions:
+    min: 2
+    max: 2
+    distribution: "discrete"             # discrete = integer values
+    
+  # Response location (x, y, z coordinates for nearest node search)
+  response_location:
+    x:
+      min: 0.0
+      max: 6.0
+    y:
+      min: 0.0
+      max: 0.0
+    z:
+      min: 3.0
+      max: 18.0
+    distribution: "uniform"
+
+# Response settings
+response:
+  stress_type: "MY"                      # MY, MZ, FX, etc.
+  stress_treatment: "node"
+  stress_location: 1                     # 0 or 1 (start or end of element)
+
+# Fixed parameters (not varied)
+fixed:
+  density: 7850.0
+  poisson_ratio: 0.3
+  gravity: [0.0, 0.0, -9.81]

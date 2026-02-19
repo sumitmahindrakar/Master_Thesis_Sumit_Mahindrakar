@@ -1,10 +1,11 @@
 from mdpa_refiner import parse_mdpa, refine_mesh, write_mdpa
 
 
-INPUT_FILE = "test_files/SA_Kratos_adj_V3/Beam_structure.mdpa"      # Input file name
-OUTPUT_FILE = "test_files/SA_Kratos_adj_V3/Beam_structure_refined.mdpa"  # Output file name
-# INPUT_FILE = "test_files/SA_beam_2D_udl_kink.gid/SA_beam_2D_udl_dual.mdpa"      # Input file name
-# OUTPUT_FILE = "test_files/SA_beam_2D_udl_kink.gid/SA_beam_2D_udl_dual_refined.mdpa" 
+# INPUT_FILE = "test_files/SA_Kratos_adj_V3/Beam_structure.mdpa"      # Input file name
+# OUTPUT_FILE = "test_files/SA_Kratos_adj_V3/Beam_structure_refined.mdpa"  # Output file name
+INPUT_FILE = "test_files/SA_Kratos_adj_V3/Frame_structure_1E.mdpa"      # Input file name
+# INPUT_FILE = "test_files/SA_Kratos_adj_V3/Frame_structure_refined.mdpa"  
+OUTPUT_FILE = "test_files/SA_Kratos_adj_V3/Frame_structure_refined.mdpa"  # Output file name
 SUBDIVISIONS = 10                 # Number of subdivisions per element
 
 # ===========================================
