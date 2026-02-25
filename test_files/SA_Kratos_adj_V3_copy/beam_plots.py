@@ -700,7 +700,7 @@ def plot_sensitivity(data, primal_data=None, traced_elem_id=6,
 # =====================================================================
 if __name__ == '__main__':
 
-    os.chdir(r"E:\Master_Thesis_Sumit_Mahindrakar\test_files\SA_Kratos_adj_V3")
+    os.chdir(r"E:\Master_Thesis_Sumit_Mahindrakar\test_files\SA_Kratos_adj_V3_copy")
 
     # ---- Load settings from adjoint JSON ----
     ADJOINT_JSON = "ProjectParametersAdjoint.json"

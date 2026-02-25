@@ -1,4 +1,6 @@
 import os
+import time
+import subprocess
 
 os.chdir(r"E:\Master_Thesis_Sumit_Mahindrakar\test_files\SA_Kratos_adj_V3_copy")
 print(f"Working directory: {os.getcwd()}")
@@ -198,6 +200,8 @@ class TestAdjointSensitivityAnalysisBeamStructureLocalStress(AdjointSensitivityA
 
 
 if __name__ == '__main__':
+    # start = time.time()
+
     suites = KratosUnittest.KratosSuites
     smallSuite = suites['small']
     smallSuite.addTests(KratosUnittest.TestLoader().loadTestsFromTestCases(
@@ -205,3 +209,9 @@ if __name__ == '__main__':
     allSuite = suites['all']
     allSuite.addTests(smallSuite)
     KratosUnittest.runTests(suites)
+    
+    
+    # elapsed = time.time() - start
+    # print(f"\nOne Kratos run: {elapsed:.1f} seconds")
+    # print(f"500 cases would take: {elapsed * 500 / 60:.1f} minutes")
+    # print(f"1000 cases would take: {elapsed * 1000 / 60:.1f} minutes")

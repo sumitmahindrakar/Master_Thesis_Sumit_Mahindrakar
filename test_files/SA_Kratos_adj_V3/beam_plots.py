@@ -703,7 +703,7 @@ if __name__ == '__main__':
     os.chdir(r"E:\Master_Thesis_Sumit_Mahindrakar\test_files\SA_Kratos_adj_V3")
 
     # ---- Load settings from adjoint JSON ----
-    ADJOINT_JSON = "ProjectParametersAdjoint.json"
+    ADJOINT_JSON = "beam_test_local_stress_adjoint_parameters.json"
 
     # Try explicit path first, then auto-detect
     if not os.path.exists(ADJOINT_JSON):

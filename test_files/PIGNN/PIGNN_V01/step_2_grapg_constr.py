@@ -358,17 +358,17 @@ class DataNormalizer:
         """
         all_x = torch.cat([d.x for d in data_list], dim=0)
         all_ea = torch.cat([d.edge_attr for d in data_list], dim=0)
-        all_yn = torch.cat([d.y_node for d in data_list], dim=0)
-        all_ye = torch.cat([d.y_element for d in data_list], dim=0)
+        # all_yn = torch.cat([d.y_node for d in data_list], dim=0)
+        # all_ye = torch.cat([d.y_element for d in data_list], dim=0)
 
         self.x_mean = all_x.mean(dim=0)
         self.x_std = all_x.std(dim=0).clamp(min=1e-8)
         self.ea_mean = all_ea.mean(dim=0)
         self.ea_std = all_ea.std(dim=0).clamp(min=1e-8)
-        self.yn_mean = all_yn.mean(dim=0)
-        self.yn_std = all_yn.std(dim=0).clamp(min=1e-8)
-        self.ye_mean = all_ye.mean(dim=0)
-        self.ye_std = all_ye.std(dim=0).clamp(min=1e-8)
+        # self.yn_mean = all_yn.mean(dim=0)
+        # self.yn_std = all_yn.std(dim=0).clamp(min=1e-8)
+        # self.ye_mean = all_ye.mean(dim=0)
+        # self.ye_std = all_ye.std(dim=0).clamp(min=1e-8)
 
         # Don't normalize binary flags
         for c in self.node_skip_cols:
@@ -388,20 +388,22 @@ class DataNormalizer:
         for name, mean, std in [
             ('Node features', self.x_mean, self.x_std),
             ('Edge features', self.ea_mean, self.ea_std),
-            ('Node targets', self.yn_mean, self.yn_std),
-            ('Elem targets', self.ye_mean, self.ye_std),
+            # ('Node targets', self.yn_mean, self.yn_std),
+            # ('Elem targets', self.ye_mean, self.ye_std),
         ]:
             print(f"  {name:<20} [{mean.min():.4e}, {mean.max():.4e}]  "
                   f"[{std.min():.4e}, {std.max():.4e}]")
-
+        print(f"  Targets: NOT normalized (raw physical units)")
+        print(f"  Physics metadata: NOT normalized (prop_E, prop_A, etc.)")
+    
     def transform(self, data: Data) -> Data:
         """Normalize one graph."""
         assert self.is_fitted
         data = data.clone()
         data.x = (data.x - self.x_mean) / self.x_std
         data.edge_attr = (data.edge_attr - self.ea_mean) / self.ea_std
-        data.y_node = (data.y_node - self.yn_mean) / self.yn_std
-        data.y_element = (data.y_element - self.ye_mean) / self.ye_std
+        # data.y_node = (data.y_node - self.yn_mean) / self.yn_std
+        # data.y_element = (data.y_element - self.ye_mean) / self.ye_std
         return data
 
     def transform_list(self, data_list: List[Data]) -> List[Data]:
