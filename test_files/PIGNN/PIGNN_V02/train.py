@@ -359,7 +359,7 @@ if __name__ == "__main__":
     print(f"  Parameters: {model.count_params():,}")
 
     # ── Loss + Optimizer ──
-    loss_fn = PhysicsLoss(w_axial=1.0, w_bending=1.0)
+    loss_fn = PhysicsLoss(w_force=1.0, w_moment=1.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=30, min_lr=1e-7
@@ -427,7 +427,7 @@ if __name__ == "__main__":
               f"  {mae:>12.6e}")
 
     # Residual check
-    F_res, M_res = loss_fn.full_residual(pred, sample)
+    F_res, M_res = loss_fn.equilibrium_residual(pred, sample)
     print(f"\n  Force  residual norm: {F_res.norm():.6e}")
     print(f"  Moment residual norm: {M_res.norm():.6e}")
 
