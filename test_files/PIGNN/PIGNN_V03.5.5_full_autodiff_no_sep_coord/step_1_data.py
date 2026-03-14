@@ -8,14 +8,13 @@ Node inputs (9 per node):
   bc_disp          (1)  1=translations fixed
   bc_rot           (1)  1=rotations fixed
   line_load        (3)  distributed load
-  response_node    (1)  1=response measured here, 0=not  ← NEW
+  response_node    (1)  1=response measured here, 0=not
 
 Element inputs (11 per element):
   length           (1)
   direction        (3)
   E, A, I22, I33   (4)
   ν, density, J    (3)
-  (no response_flag here anymore)
 
 =================================================================
 """
@@ -97,15 +96,6 @@ class FrameDataLoader:
     def _read_config(self, case_num: int) -> dict:
         """
         Read case_config.json, flatten nested 'parameters'.
-        
-        After flattening:
-            config['traced_element_id']  = 8
-            config['nearest_node_id']    = 10
-            config['stress_location']    = 1
-            config['udl']                = 37.85
-            config['youngs_modulus']      = 1.07e11
-            config['I22']                = 0.000225
-            config['response_coords']    = [3.84, 0, 7.13]
         """
         with open(self._config_path(case_num), 'r') as f:
             raw = json.load(f)
@@ -159,7 +149,6 @@ class FrameDataLoader:
             threshold = max_disp * 1e-8 if max_disp > 0 else 1e-15
             support_nodes = np.where(disp_mag < threshold)[0]
             bc_disp[support_nodes] = 1.0
-            # bc_rot[support_nodes] = 0.0
             # Check if rotation is ALSO fixed at support nodes
             if rotation is not None:
                 rot_mag = np.linalg.norm(rotation, axis=1)
@@ -168,7 +157,6 @@ class FrameDataLoader:
                 for node in support_nodes:
                     if rot_mag[node] < rot_thresh:
                         bc_rot[node] = 1.0    # fixed support
-                    # else: bc_rot stays 0    # pin support
 
         return bc_disp, bc_rot
 
@@ -179,11 +167,7 @@ class FrameDataLoader:
                                     ) -> np.ndarray:
         """
         Build response node flag.
-        
         (N, 1): 1.0 at the response node, 0.0 elsewhere.
-        
-        This tells the GNN: "The bending moment sensitivity
-        is measured at THIS node's location."
         """
         resp_flag = np.zeros((n_nodes, 1), dtype=np.float64)
         if 0 <= nearest_node_id < n_nodes:
@@ -201,67 +185,53 @@ class FrameDataLoader:
         directions = diff / safe_L[:, np.newaxis]
         return {'lengths': lengths, 'directions': directions}
 
+    # ─── ELEMENT LOAD (from nodal LINE_LOAD) ───
+
     def _compute_element_load(self, line_load_nodes, connectivity):
         """
         Convert node-level LINE_LOAD to element-level UDL.
-        
-        Kratos applies LINE_LOAD per condition (≈ per element),
-        then we transfer to nodes for VTK. Now reverse that:
-        
-        Logic: If BOTH end nodes have the same non-zero load,
-        the element carries that UDL. If either is zero,
-        check if the other has load (partial). Average is safe.
-        
-        Args:
-            line_load_nodes: (N, 3) from VTK point_data
-            connectivity:    (E, 2) element node pairs
-        
-        Returns:
-            elem_load: (E, 3) distributed load per element
+        Average of both end nodes.
         """
         n1_load = line_load_nodes[connectivity[:, 0]]  # (E, 3)
         n2_load = line_load_nodes[connectivity[:, 1]]  # (E, 3)
-        
-        # For UDL: both nodes should have the same value
-        # Average handles edge cases (partial loading, interpolation)
         elem_load = 0.5 * (n1_load + n2_load)
-        
         return elem_load
+
+    # ─── FIX: ZERO OUT COLUMN LOADS ───
+
+    @staticmethod
+    def fix_elem_load(elem_load, elem_directions):
+        """
+        Zero out elem_load for column (vertical) elements.
+
+        LINE_LOAD in Kratos is applied via conditions on beam elements only.
+        Junction nodes share the load value, but it should NOT propagate
+        to column elements through nodal averaging.
+
+        For vertical elements (|dz| > |dx|): set load to zero.
+        """
+        elem_load_fixed = elem_load.copy()
+
+        for e in range(len(elem_directions)):
+            dx = abs(elem_directions[e, 0])
+            dz = abs(elem_directions[e, 2])
+
+            if dz > dx:  # Vertical element (column)
+                elem_load_fixed[e] = [0.0, 0.0, 0.0]
+
+        # Report
+        n_zeroed = np.sum(np.any(elem_load != elem_load_fixed, axis=1))
+        print(f"    Fixed elem_load: zeroed {n_zeroed} column elements")
+
+        return elem_load_fixed
 
     # ─── LOAD ONE CASE ───
 
     def load_case(self, case_num: int) -> dict:
         """
         Load one case.
-        
-        Returns dict:
-        
-        INPUTS:
-          coords              (N, 3)   node coordinates
-          connectivity        (E, 2)   element connectivity
-          bc_disp             (N, 1)   displacement BC flag
-          bc_rot              (N, 1)   rotation BC flag
-          line_load           (N, 3)   distributed load
-          response_node_flag  (N, 1)   1 at response node  ← NODE LEVEL
-          young_modulus       (E,)     from VTK
-          cross_area          (E,)     from VTK
-          I22                 (E,)     from VTK
-          I33                 (E,)     from VTK
-          poisson_ratio       (E,)     from VTK
-          density             (E,)     from VTK
-          torsional_inertia   (E,)     from VTK
-          elem_lengths        (E,)     computed
-          elem_directions     (E, 3)   computed
-        
-        OUTPUTS:
-          displacement        (N, 3)
-          rotation            (N, 3)
-          moment              (E, 3)
-          force               (E, 3)
-          I22_sensitivity     (E,)
-        
-        METADATA:
-          case_num, nearest_node_id, traced_element_id, config
+
+        Returns dict with INPUTS, OUTPUTS, METADATA.
         """
         print(f"\n  Case {case_num}:")
 
@@ -306,13 +276,9 @@ class FrameDataLoader:
         # OUTPUT: Displacement, Rotation
         displacement = self._get_point_field(primal, 'DISPLACEMENT')
         rotation = self._get_point_field(primal, 'ROTATION')
+
         # ═══ EXTRACT 2D FRAME DOFs ═══
-        # For 2D frames in XZ plane:
-        #   u_x = displacement[:, 0]   (axial)
-        #   u_z = displacement[:, 2]   (transverse)
-        #   phi = rotation[:, 1]       (rotation about Y-axis)
-        
-        if displacement is not None:
+        if displacement is not None and rotation is not None:
             nodal_disp_2d = np.stack([
                 displacement[:, 0],   # u_x
                 displacement[:, 2],   # u_z
@@ -324,8 +290,8 @@ class FrameDataLoader:
         # OUTPUT: Moment, Force
         moment = self._get_cell_field(primal, 'MOMENT')
         force = self._get_cell_field(primal, 'FORCE')
+
         # ═══ EXTRACT 2D INTERNAL FORCES ═══
-        # For 2D frames: N (axial), V (shear in z), M (moment about y)
         if force is not None:
             elem_N = force[:, 0]       # Axial force (along x)
             elem_V = force[:, 2]       # Shear force (along z)
@@ -356,23 +322,22 @@ class FrameDataLoader:
             coords, displacement, rotation)
         response_node_flag = self._build_response_node_flag(
             N, nearest_node)
+
+        # Element geometry (MUST be computed BEFORE elem_load fix)
         geom = self._compute_element_geometry(coords, connectivity)
 
         # Element-level UDL (from node-level LINE_LOAD)
         elem_load = self._compute_element_load(line_load, connectivity)
+
+        # ═══ FIX: Zero out column elements that incorrectly inherited load ═══
+        elem_load = self.fix_elem_load(elem_load, geom['directions'])
 
         # Print which elements carry load
         loaded_elems = np.where(
             np.linalg.norm(elem_load, axis=1) > 1e-10
         )[0]
         print(f"    Loaded elements: {len(loaded_elems)}/{E} "
-            f"(UDL on beams only)")
-
-        # RESPONSE AT NODE LEVEL
-        response_node_flag = self._build_response_node_flag(
-            N, nearest_node)
-
-        geom = self._compute_element_geometry(coords, connectivity)
+              f"(UDL on beams only)")
 
         # ═══ 5. ASSEMBLE ═══
         case = {
@@ -382,8 +347,8 @@ class FrameDataLoader:
             'bc_disp':             bc_disp,             # (N, 1)
             'bc_rot':              bc_rot,              # (N, 1)
             'line_load':           line_load,           # (N, 3)
-            'elem_load':           elem_load,
-            'response_node_flag':  response_node_flag,  # (N, 1) ← NODE
+            'elem_load':           elem_load,           # (E, 3) ← FIXED
+            'response_node_flag':  response_node_flag,  # (N, 1)
             'young_modulus':       props['young_modulus'],
             'cross_area':          props['cross_area'],
             'I22':                 props['I22'],
@@ -393,11 +358,12 @@ class FrameDataLoader:
             'torsional_inertia':   props['torsional_inertia'],
             'elem_lengths':        geom['lengths'],
             'elem_directions':     geom['directions'],
-           # ── PRIMARY OUTPUTS (network targets) ──
+
+            # ── PRIMARY OUTPUTS (network targets) ──
             'displacement':        displacement,        # (N, 3) full 3D
             'rotation':            rotation,            # (N, 3) full 3D
             'nodal_disp_2d':       nodal_disp_2d,       # (N, 3) [u_x, u_z, φ]
-            
+
             # ── PHYSICS OUTPUTS (strong-form targets) ──
             'moment':              moment,              # (E, 3) full 3D
             'force':               force,               # (E, 3) full 3D
@@ -405,6 +371,7 @@ class FrameDataLoader:
             'elem_V':              elem_V,              # (E,) shear force
             'elem_M':              elem_M,              # (E,) bending moment
             'I22_sensitivity':     I22_sensitivity,
+
             # ── METADATA ──
             'n_nodes':             N,
             'n_elements':          E,
@@ -482,6 +449,24 @@ class FrameDataLoader:
         print(f"    I22:            [{min(I22s):.4e}, {max(I22s):.4e}]")
         print(f"    Response nodes: {sorted(set(resp_nodes))}")
 
+        # ── Verify elem_load fix ──
+        c0 = dataset[0]
+        unique_qz = np.unique(c0['elem_load'][:, 2].round(4))
+        n_loaded = np.sum(np.abs(c0['elem_load'][:, 2]) > 1e-5)
+        n_beams = np.sum(
+            np.abs(c0['elem_directions'][:, 0]) >
+            np.abs(c0['elem_directions'][:, 2])
+        )
+        n_columns = E - n_beams
+        print(f"\n  elem_load verification (case 0):")
+        print(f"    Unique qz values: {unique_qz}")
+        print(f"    Loaded elements:  {n_loaded} "
+              f"(beams={n_beams}, columns={n_columns})")
+        if n_loaded <= n_beams:
+            print(f"    ✓ No columns carry load (fix working)")
+        else:
+            print(f"    ✗ WARNING: columns still carry load!")
+
         print(f"\n  Feature dimensions:")
         print(f"  ┌─────────────────────────────────────────┐")
         print(f"  │ NODE INPUTS (per node):          9      │")
@@ -533,14 +518,15 @@ if __name__ == "__main__":
     print("  STEP 1: Load Kratos Data")
     print("=" * 60)
 
+
     loader = FrameDataLoader(
         primal_base_dir="test_files/Kratos_data_creation/primal",
         adjoint_base_dir="test_files/Kratos_data_creation/adjoint",
-        primal_folder_prefix="case_primal_",         # ← FIXED
+        primal_folder_prefix="case_primal_",
         adjoint_folder_prefix="case_adjoint_",
-        primal_vtk_subdir="vtk_output_primal",       # primal has subdir
-        adjoint_vtk_subdir="vtk_output_adjoint",                        # ← FIXED: no subdir
-        vtk_filename="Structure_0_1.vtk"              # ← FIXED
+        primal_vtk_subdir="vtk_output_primal",
+        adjoint_vtk_subdir="vtk_output_adjoint",
+        vtk_filename="Structure_0_1.vtk"
     )
 
     dataset = loader.load_all()
@@ -560,5 +546,10 @@ if __name__ == "__main__":
         print(f"  response_node_flag: "
               f"node={np.where(c['response_node_flag'].flatten()>0.5)[0]}")
         print(f"  (nearest_node_id from config: {c['nearest_node_id']})")
+
+        # ── Verify the fix ──
+        print(f"\n  elem_load unique qz: "
+              f"{np.unique(c['elem_load'][:, 2].round(4))}")
+        print(f"  Expected: [0.0, -97.3409] (no -48.6705)")
 
     print("\n  Step 1 COMPLETE → proceed to Step 2")

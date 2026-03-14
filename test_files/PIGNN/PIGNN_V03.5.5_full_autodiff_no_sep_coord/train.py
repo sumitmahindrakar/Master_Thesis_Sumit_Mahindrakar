@@ -64,7 +64,7 @@ class TrainConfig:
     edge_in_dim     = 10
 
     # ── Training ──
-    epochs          = 500
+    epochs          = 300
     lr              = 1e-3
     weight_decay    = 1e-5
     scheduler_step  = 100
@@ -490,28 +490,28 @@ class Trainer:
             else:
                 print(f"  ✅ Good accuracy")
 
-        # ── Expected problems ──
-        print(f"\n  {'═'*50}")
-        print(f"  EXPECTED PROBLEMS TO OBSERVE:")
-        print(f"  {'─'*50}")
-        print(f"  1. L_M (moment) does NOT converge:")
-        print(f"     → ∂²uz/∂x² through GNN ≠ physical curvature")
-        print(f"     → autograd measures GNN sensitivity, not beam bending")
-        print(f"")
-        print(f"  2. L_V (shear) is NOISY or DIVERGES:")
-        print(f"     → 3rd derivative through GNN = amplified noise")
-        print(f"     → chain rule through 3 levels of message passing")
-        print(f"")
-        print(f"  3. L_N (axial) may PARTIALLY work:")
-        print(f"     → 1st derivative is less noisy")
-        print(f"     → but still contaminated by .sum() in autograd")
-        print(f"")
-        print(f"  4. Displacement accuracy is POOR:")
-        print(f"     → constitutive losses don't provide correct gradients")
-        print(f"     → model has no reliable bending/shear supervision")
-        print(f"")
-        print(f"  CONCLUSION: Need Method C (field decoder) to fix this.")
-        print(f"  {'═'*50}")
+        # # ── Expected problems ──
+        # print(f"\n  {'═'*50}")
+        # print(f"  EXPECTED PROBLEMS TO OBSERVE:")
+        # print(f"  {'─'*50}")
+        # print(f"  1. L_M (moment) does NOT converge:")
+        # print(f"     → ∂²uz/∂x² through GNN ≠ physical curvature")
+        # print(f"     → autograd measures GNN sensitivity, not beam bending")
+        # print(f"")
+        # print(f"  2. L_V (shear) is NOISY or DIVERGES:")
+        # print(f"     → 3rd derivative through GNN = amplified noise")
+        # print(f"     → chain rule through 3 levels of message passing")
+        # print(f"")
+        # print(f"  3. L_N (axial) may PARTIALLY work:")
+        # print(f"     → 1st derivative is less noisy")
+        # print(f"     → but still contaminated by .sum() in autograd")
+        # print(f"")
+        # print(f"  4. Displacement accuracy is POOR:")
+        # print(f"     → constitutive losses don't provide correct gradients")
+        # print(f"     → model has no reliable bending/shear supervision")
+        # print(f"")
+        # print(f"  CONCLUSION: Need Method C (field decoder) to fix this.")
+        # print(f"  {'═'*50}")
 
     def _classify_convergence(self, key, val):
         """Simple convergence status label."""
