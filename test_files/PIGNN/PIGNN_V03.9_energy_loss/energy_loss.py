@@ -1,15 +1,10 @@
 """
 =================================================================
-energy_loss.py — Total Potential Energy Loss for 2D Frames
+energy_loss.py — FIXED: Negate θ for Kratos Sign Convention
 =================================================================
 
-Adapted from Dalton et al. PI-GNN approach:
-  Loss = Π = U_internal - W_external
-
-At equilibrium: ∂Π/∂u = 0 (minimum of energy)
-At u=0: Π = 0, but ∂Π/∂u = -F_ext ≠ 0 → gradient pushes away!
-
-No zero attractor. No normalization needed.
+Kratos θ_y uses opposite sign to standard E-B stiffness matrix.
+Fix: θ_local = -θ_global in strain energy computation.
 =================================================================
 """
 
@@ -19,59 +14,43 @@ import torch.nn as nn
 
 class FrameEnergyLoss(nn.Module):
     """
-    Total Potential Energy loss for 2D Euler-Bernoulli frame.
+    Total Potential Energy with Kratos rotation fix.
     
     Π = U_strain - W_external
     
-    U_strain = Σ_e [U_axial_e + U_bending_e]
-    W_external = Σ_i [Fx_i·ux_i + Fz_i·uz_i + My_i·θ_i]
+    U uses -θ (corrected sign convention)
+    W uses +θ (external moment · rotation, sign cancels)
     """
 
     def __init__(self):
         super().__init__()
 
     def forward(self, model, data):
-        """
-        Args:
-            model: PIGNN that outputs (N, 3) raw predictions
-            data: PyG Data object
-        
-        Returns:
-            Pi_norm: normalized potential energy (scalar loss)
-            loss_dict: diagnostics
-            pred_raw: raw network output
-            u_phys: physical displacements
-        """
-        # 1. Network prediction (raw, ~O(1) if scaled)
-        pred_raw = model(data)  # (N, 3)
+        pred_raw = model(data)
 
-        # 2. Convert to physical displacements
         u_phys = torch.zeros_like(pred_raw)
-        u_phys[:, 0] = pred_raw[:, 0] * data.u_c   # ux
-        u_phys[:, 1] = pred_raw[:, 1] * data.u_c   # uz
-        u_phys[:, 2] = pred_raw[:, 2] * data.theta_c  # θy
+        u_phys[:, 0] = pred_raw[:, 0] * data.u_c
+        u_phys[:, 1] = pred_raw[:, 1] * data.u_c
+        u_phys[:, 2] = pred_raw[:, 2] * data.theta_c
 
-        # 3. Strain energy
         U_internal = self._strain_energy(u_phys, data)
-
-        # 4. External work
         W_external = self._external_work(u_phys, data)
 
-        # 5. Total potential energy
         Pi = U_internal - W_external
 
-        # 6. Normalize by characteristic energy scale
         E_c = (data.F_c * data.u_c).clamp(min=1e-30)
         Pi_norm = Pi / E_c
 
-        # 7. Diagnostics
         loss_dict = {
             'total':      Pi_norm.item(),
             'Pi':         Pi.item(),
             'Pi_norm':    Pi_norm.item(),
             'U_internal': U_internal.item(),
             'W_external': W_external.item(),
-            'U_over_W':   (U_internal / W_external.abs().clamp(min=1e-30)).item(),
+            'U_over_W':   (
+                U_internal
+                / W_external.abs().clamp(min=1e-30)
+            ).item(),
             'ux_range':   [u_phys[:, 0].min().item(),
                           u_phys[:, 0].max().item()],
             'uz_range':   [u_phys[:, 1].min().item(),
@@ -86,25 +65,23 @@ class FrameEnergyLoss(nn.Module):
 
     def _strain_energy(self, u_phys, data):
         """
-        Internal strain energy for all beam elements.
+        U = (1/2) Σ_e d_local^T K_local d_local
         
-        Axial:   U_ax = (EA/2L) · (u_B - u_A)²
-        Bending: U_bd = (EI/2L) · [4θA² + 4θB² + 4θAθB
-                        + (12/L²)(wA² + wB² - 2wAwB)
-                        - (12/L)(wB-wA)(θA+θB)]
+        With NEGATED θ to match Kratos convention.
         """
         conn = data.connectivity
         nA, nB = conn[:, 0], conn[:, 1]
+        n_elem = conn.shape[0]
+        device = u_phys.device
 
         L  = data.elem_lengths
         EA = data.prop_E * data.prop_A
         EI = data.prop_E * data.prop_I22
 
-        # Direction cosines (element local → global)
-        c = data.elem_directions[:, 0]   # cos α
-        s = data.elem_directions[:, 2]   # sin α
+        c = data.elem_directions[:, 0]
+        s = data.elem_directions[:, 2]
 
-        # Global DOFs at element ends
+        # Global DOFs
         ux_A = u_phys[nA, 0]
         uz_A = u_phys[nA, 1]
         th_A = u_phys[nA, 2]
@@ -112,53 +89,89 @@ class FrameEnergyLoss(nn.Module):
         uz_B = u_phys[nB, 1]
         th_B = u_phys[nB, 2]
 
-        # Global → Local transformation
-        # Local axial:      u_loc =  c·ux + s·uz
-        # Local transverse: w_loc = -s·ux + c·uz
+        # Transform to local
         u_A_loc =  c * ux_A + s * uz_A
         w_A_loc = -s * ux_A + c * uz_A
         u_B_loc =  c * ux_B + s * uz_B
         w_B_loc = -s * ux_B + c * uz_B
 
-        # ── Axial strain energy ──
-        du = u_B_loc - u_A_loc
-        U_axial = 0.5 * (EA / L) * du**2
+        # ═══════════════════════════════════════
+        # NEGATE θ for Kratos sign convention
+        # ═══════════════════════════════════════
+        th_A_loc = -th_A
+        th_B_loc = -th_B
 
-        # ── Bending strain energy (Hermite) ──
-        dw = w_B_loc - w_A_loc
+        # Local DOF vector
+        d_local = torch.stack([
+            u_A_loc, w_A_loc, th_A_loc,
+            u_B_loc, w_B_loc, th_B_loc
+        ], dim=1)  # (E, 6)
 
-        U_bend = (EI / (2 * L)) * (
-            4 * th_A**2
-            + 4 * th_B**2
-            + 4 * th_A * th_B
-            + (12 / L**2) * (w_A_loc**2 + w_B_loc**2
-                             - 2 * w_A_loc * w_B_loc)
-            - (12 / L) * dw * (th_A + th_B)
-        )
+        # Build K_local
+        K = torch.zeros(n_elem, 6, 6, device=device)
 
-        return (U_axial + U_bend).sum()
+        ea_L  = EA / L
+        ei_L  = EI / L
+        ei_L2 = EI / L**2
+        ei_L3 = EI / L**3
+
+        # Axial
+        K[:, 0, 0] =  ea_L
+        K[:, 0, 3] = -ea_L
+        K[:, 3, 0] = -ea_L
+        K[:, 3, 3] =  ea_L
+
+        # Bending
+        K[:, 1, 1] =  12 * ei_L3
+        K[:, 1, 2] =   6 * ei_L2
+        K[:, 1, 4] = -12 * ei_L3
+        K[:, 1, 5] =   6 * ei_L2
+
+        K[:, 2, 1] =   6 * ei_L2
+        K[:, 2, 2] =   4 * ei_L
+        K[:, 2, 4] =  -6 * ei_L2
+        K[:, 2, 5] =   2 * ei_L
+
+        K[:, 4, 1] = -12 * ei_L3
+        K[:, 4, 2] =  -6 * ei_L2
+        K[:, 4, 4] =  12 * ei_L3
+        K[:, 4, 5] =  -6 * ei_L2
+
+        K[:, 5, 1] =   6 * ei_L2
+        K[:, 5, 2] =   2 * ei_L
+        K[:, 5, 4] =  -6 * ei_L2
+        K[:, 5, 5] =   4 * ei_L
+
+        # U = (1/2) d^T K d
+        Kd = torch.bmm(K, d_local.unsqueeze(2))
+        U_per_elem = 0.5 * torch.bmm(
+            d_local.unsqueeze(1), Kd
+        ).squeeze()
+
+        return U_per_elem.sum()
 
     def _external_work(self, u_phys, data):
         """
-        Work done by external forces.
+        W = Σ_i (Fx·ux + Fz·uz + My·θ)
         
-        W = Σ_i (Fx_i·ux_i + Fz_i·uz_i + My_i·θy_i)
+        NOTE: We do NOT negate θ here!
+        The external moment My is defined in Kratos 
+        convention, so My·θ_kratos is correct as-is.
         
-        F_ext layout: (N, 3) = [Fx, Fz, My]
-        u_phys layout: (N, 3) = [ux, uz, θy]
+        (The negation only applies to the INTERNAL
+        stiffness matrix sign convention.)
         """
         W = (
-            data.F_ext[:, 0] * u_phys[:, 0]    # Fx · ux
-            + data.F_ext[:, 1] * u_phys[:, 1]  # Fz · uz
-            + data.F_ext[:, 2] * u_phys[:, 2]  # My · θy
+            data.F_ext[:, 0] * u_phys[:, 0]
+            + data.F_ext[:, 1] * u_phys[:, 1]
+            + data.F_ext[:, 2] * u_phys[:, 2]
         ).sum()
-
         return W
 
 
-# ════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════
 # VERIFICATION
-# ════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════
 
 if __name__ == "__main__":
     import os
@@ -168,7 +181,7 @@ if __name__ == "__main__":
     os.chdir(CURRENT_SUBFOLDER)
 
     print("=" * 70)
-    print("  ENERGY LOSS VERIFICATION")
+    print("  ENERGY LOSS VERIFICATION (θ-Negated)")
     print("=" * 70)
 
     data_list = torch.load(
@@ -183,97 +196,209 @@ if __name__ == "__main__":
 
     loss_fn = FrameEnergyLoss()
 
-    for i in range(min(3, len(data_list))):
+    # ══════════════════════════════════════════
+    # TEST 1: Cantilever checks
+    # ══════════════════════════════════════════
+    from torch_geometric.data import Data
+
+    L_t = 10.0
+    E_t = 2.1e11
+    A_t = 0.01
+    I_t = 8.333e-6
+
+    # 1a: Horizontal
+    print(f"\n  TEST 1a: Horizontal cantilever")
+    P_h = -1000.0
+    w_h = P_h * L_t**3 / (3 * E_t * I_t)
+    th_h = P_h * L_t**2 / (2 * E_t * I_t)
+    U_exact_h = abs(P_h) * abs(w_h) / 2
+
+    test_h = Data(
+        connectivity=torch.tensor([[0, 1]]),
+        elem_lengths=torch.tensor([L_t],
+                                   dtype=torch.float32),
+        elem_directions=torch.tensor(
+            [[1, 0, 0]], dtype=torch.float32),
+        prop_E=torch.tensor([E_t],
+                            dtype=torch.float32),
+        prop_A=torch.tensor([A_t],
+                            dtype=torch.float32),
+        prop_I22=torch.tensor([I_t],
+                              dtype=torch.float32),
+        F_ext=torch.tensor(
+            [[0, 0, 0], [0, P_h, 0]],
+            dtype=torch.float32),
+        F_c=torch.tensor(abs(P_h)),
+        u_c=torch.tensor(abs(w_h)),
+        theta_c=torch.tensor(abs(th_h)),
+    )
+
+    # Kratos convention: θ has opposite sign
+    # So tip rotation in Kratos = -th_h
+    u_h = torch.tensor(
+        [[0, 0, 0], [0, w_h, -th_h]],
+        dtype=torch.float32
+    )
+
+    U_h = loss_fn._strain_energy(u_h, test_h)
+    W_h = loss_fn._external_work(u_h, test_h)
+    UW_h = (U_h / abs(W_h)).item()
+    print(f"    Kratos θ (negated): {-th_h:.4e}")
+    print(f"    U = {U_h.item():.6e} "
+          f"(exact: {U_exact_h:.6e})")
+    print(f"    U/|W| = {UW_h:.6f} "
+          f"{'✓' if abs(UW_h - 0.5) < 0.001 else '✗'}")
+
+    # 1b: Vertical
+    print(f"\n  TEST 1b: Vertical cantilever")
+    P_v = 1000.0
+    w_v = P_v * L_t**3 / (3 * E_t * I_t)
+    th_v = P_v * L_t**2 / (2 * E_t * I_t)
+    U_exact_v = abs(P_v) * abs(w_v) / 2
+
+    test_v = Data(
+        connectivity=torch.tensor([[0, 1]]),
+        elem_lengths=torch.tensor([L_t],
+                                   dtype=torch.float32),
+        elem_directions=torch.tensor(
+            [[0, 0, 1]], dtype=torch.float32),
+        prop_E=torch.tensor([E_t],
+                            dtype=torch.float32),
+        prop_A=torch.tensor([A_t],
+                            dtype=torch.float32),
+        prop_I22=torch.tensor([I_t],
+                              dtype=torch.float32),
+        F_ext=torch.tensor(
+            [[0, 0, 0], [P_v, 0, 0]],
+            dtype=torch.float32),
+        F_c=torch.tensor(abs(P_v)),
+        u_c=torch.tensor(abs(w_v)),
+        theta_c=torch.tensor(abs(th_v)),
+    )
+
+    # Kratos: positive θ for vertical column with 
+    # positive Fx → test both
+    for th_sign_label, th_val in [
+        ("Kratos +θ", th_v),
+        ("Kratos -θ", -th_v),
+    ]:
+        u_v = torch.tensor(
+            [[0, 0, 0], [w_v, 0, th_val]],
+            dtype=torch.float32
+        )
+        U_v = loss_fn._strain_energy(u_v, test_v)
+        W_v = loss_fn._external_work(u_v, test_v)
+        UW_v = (U_v / abs(W_v)).item()
+        err = abs(U_v.item() - U_exact_v) / U_exact_v
+        print(f"    {th_sign_label}: "
+              f"U/|W|={UW_v:.4f}, "
+              f"err={err:.2e} "
+              f"{'✓' if err < 1e-3 else '✗'}")
+
+    # ══════════════════════════════════════════
+    # TEST 2: Kratos frame data
+    # ══════════════════════════════════════════
+    print(f"\n\n  TEST 2: Kratos frame data")
+
+    for i in range(min(5, len(data_list))):
         data = data_list[i]
         u_true = data.y_node.clone()
 
-        # ── Energy at TRUE solution ──
         U_true = loss_fn._strain_energy(u_true, data)
         W_true = loss_fn._external_work(u_true, data)
         Pi_true = U_true - W_true
 
-        # ── Energy at ZERO ──
-        u_zero = torch.zeros_like(u_true)
-        U_zero = loss_fn._strain_energy(u_zero, data)
-        W_zero = loss_fn._external_work(u_zero, data)
-        Pi_zero = U_zero - W_zero
+        Pi_zero = torch.tensor(0.0)
 
-        # ── Energy at 2x TRUE (overshoot) ──
-        u_2x = 2.0 * u_true
-        U_2x = loss_fn._strain_energy(u_2x, data)
-        W_2x = loss_fn._external_work(u_2x, data)
-        Pi_2x = U_2x - W_2x
+        UW = (U_true / W_true.abs().clamp(
+            min=1e-30
+        )).item()
 
-        print(f"\n  Case {i}:")
-        print(f"    {'':15} {'U_strain':>14} {'W_external':>14} "
-              f"{'Π=U-W':>14}")
-        print(f"    {'ZERO':15} {U_zero.item():14.6e} "
-              f"{W_zero.item():14.6e} {Pi_zero.item():14.6e}")
-        print(f"    {'TRUE':15} {U_true.item():14.6e} "
-              f"{W_true.item():14.6e} {Pi_true.item():14.6e}")
-        print(f"    {'2x TRUE':15} {U_2x.item():14.6e} "
-              f"{W_2x.item():14.6e} {Pi_2x.item():14.6e}")
+        status = ("✓" if Pi_true < Pi_zero
+                  else "✗")
+        print(f"    Case {i}: U={U_true.item():.4e}, "
+              f"W={W_true.item():.4e}, "
+              f"Π={Pi_true.item():.4e}, "
+              f"U/|W|={UW:.4f} {status}")
 
-        if Pi_true < Pi_zero and Pi_true < Pi_2x:
-            print(f"    ✓ True solution MINIMIZES energy")
-        elif Pi_true < Pi_zero:
-            print(f"    ~ True < Zero but True > 2x "
-                  f"(check bending signs)")
-        else:
-            print(f"    ✗ ERROR: energy not minimized "
-                  f"at true solution!")
-
-        # ── Theorem check: at minimum, U = W/2 ──
-        # For linear elasticity: Π_min = -U = -W/2
-        ratio = U_true / W_true.abs().clamp(min=1e-30)
-        print(f"    U/|W| = {ratio.item():.4f} "
-              f"(should be ~0.5 for linear)")
-
-    # ── Gradient check at u=0 ──
-    print(f"\n  Gradient at u=0:")
+    # ══════════════════════════════════════════
+    # TEST 3: Energy landscape
+    # ══════════════════════════════════════════
+    print(f"\n\n  TEST 3: Energy along u_true")
     data = data_list[0]
-    u = torch.zeros(data.num_nodes, 3, requires_grad=True)
+    u_true = data.y_node.clone()
 
-    U = loss_fn._strain_energy(u, data)
-    W = loss_fn._external_work(u, data)
-    Pi = U - W
+    print(f"    α      Π              U/|W|")
+    alphas = [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    Pi_vals = []
+    for alpha in alphas:
+        u_a = alpha * u_true
+        U_a = loss_fn._strain_energy(u_a, data)
+        W_a = loss_fn._external_work(u_a, data)
+        Pi_a = (U_a - W_a).item()
+        UW_a = (U_a / W_a.abs().clamp(
+            min=1e-30
+        )).item()
+        Pi_vals.append(Pi_a)
+        marker = (" ← should be min"
+                  if alpha == 1.0 else "")
+        print(f"    {alpha:.2f}   {Pi_a:14.6e}   "
+              f"{UW_a:.4f}{marker}")
+
+    min_idx = Pi_vals.index(min(Pi_vals))
+    correct = (min_idx == alphas.index(1.0))
+    print(f"\n    Minimum at α={alphas[min_idx]:.2f} "
+          f"({'✓ CORRECT' if correct else '✗ WRONG'})")
+
+    # ══════════════════════════════════════════
+    # TEST 4: Gradient at u=0
+    # ══════════════════════════════════════════
+    print(f"\n\n  TEST 4: Gradient at u=0")
+    data = data_list[0]
+    u = torch.zeros(
+        data.num_nodes, 3, requires_grad=True
+    )
+
+    Pi = (loss_fn._strain_energy(u, data)
+        - loss_fn._external_work(u, data))
     Pi.backward()
 
     grad = u.grad
     print(f"    Π(0) = {Pi.item():.6e}")
-    print(f"    U(0) = {U.item():.6e} (should be 0)")
-    print(f"    W(0) = {W.item():.6e} (should be 0)")
     print(f"    ∇Π = [{grad.min().item():.4e}, "
           f"{grad.max().item():.4e}]")
     print(f"    |∇Π| = {grad.norm().item():.4e}")
 
-    # At u=0: U=0, W=0, so ∂Π/∂u = ∂U/∂u - F_ext = -F_ext
-    # Gradient should equal -F_ext
-    F_ext_norm = data.F_ext.norm().item()
-    print(f"    |F_ext| = {F_ext_norm:.4e}")
-    print(f"    |∇Π|/|F_ext| = "
-          f"{grad.norm().item()/max(F_ext_norm,1e-30):.4f} "
-          f"(should be ~1.0)")
+    # Verify ∂Π/∂u = -F_ext at u=0
+    for dof, name in [(0, 'Fx'), (1, 'Fz'), (2, 'My')]:
+        g = grad[:, dof]
+        f = -data.F_ext[:, dof]
+        loaded = f.abs() > 1e-10
+        if loaded.any():
+            match = torch.allclose(
+                g[loaded], f[loaded],
+                rtol=1e-3, atol=1e-6
+            )
+            print(f"    ∂Π/∂u_{name} = -F_{name}? "
+                  f"{'✓' if match else '✗'}")
+            if not match:
+                idx = loaded.nonzero()[0].item()
+                print(f"      node {idx}: "
+                      f"grad={g[idx].item():.4e}, "
+                      f"-F={f[idx].item():.4e}")
 
-    # Check gradient direction matches -F_ext
-    grad_Fx = grad[:, 0]
-    Fext_x = -data.F_ext[:, 0]
-    loaded = data.F_ext[:, 0].abs() > 1e-10
-    if loaded.any():
-        match = torch.allclose(
-            grad_Fx[loaded], Fext_x[loaded],
-            rtol=1e-4, atol=1e-6
-        )
-        print(f"    ∂Π/∂ux = -Fx? {match}")
-
-    # ── Step test: gradient descent reduces energy ──
-    print(f"\n  Gradient descent test:")
-    for step in [1e-6, 1e-4, 1e-2, 1e-1]:
-        u_step = (-step * grad / grad.norm()).detach()
-        Pi_step = loss_fn._strain_energy(u_step, data) \
-                - loss_fn._external_work(u_step, data)
-        print(f"    step={step:.0e}: "
-              f"Π = {Pi_step.item():12.6e}  "
-              f"{'↓' if Pi_step < Pi else '↑'}")
+    # ══════════════════════════════════════════
+    # TEST 5: Target energy for training
+    # ══════════════════════════════════════════
+    print(f"\n\n  TEST 5: Target energies")
+    for i in range(min(5, len(data_list))):
+        data = data_list[i]
+        u_true = data.y_node.clone()
+        U = loss_fn._strain_energy(u_true, data)
+        W = loss_fn._external_work(u_true, data)
+        Pi = U - W
+        E_c = (data.F_c * data.u_c).clamp(min=1e-30)
+        Pi_norm = (Pi / E_c).item()
+        print(f"    Case {i}: Π_norm = {Pi_norm:.4e}")
 
     print(f"\n  DONE ✓")
