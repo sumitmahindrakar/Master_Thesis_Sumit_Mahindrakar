@@ -1,0 +1,355 @@
+============================================================
+Possibility-
+The autograd derivatives are essentially meaningless. The MLP does not produce a spatially coherent displacement field — it outputs per-node values that have no meaningful spatial gradient
+Use FD
+============================================================
+
+
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar\test_files\PIGNN\PIGNN_V03.5.5_full_autodiff_no_sep_coord_pt_load
+============================================================
+  PIGNN TRAINING — Autograd + Non-dim
+============================================================
+  Device: cuda
+
+── Loading data ──
+  Path: DATA/graph_dataset_norm.pt
+  Loaded 10 graphs
+  Physics scales present ✓
+
+  Data verification:
+    x range:        [0.0000, 1.0000]  (OK [0,1])
+    edge_attr range: [0.0000, 1.0000]  (OK [0,1])
+    coords range:   [0.00, 18.00]  (raw m)
+    prop_E range:   [1.00e+10, 1.00e+10]  (raw Pa)
+    F_ext range:    [-61.81, 0.00]  (raw N)
+    F_c  = 6.1808e+01  (char. force)
+    M_c  = 3.0904e+01  (char. moment)
+    u_c  = 7.7260e-05  (char. disp)
+    θ_c  = 1.5452e-04  (char. rot)
+  Nodes: 212, Elements: 216
+
+── Creating model ──
+
+══════════════════════════════════════════════════
+  PIGNN Model Summary
+══════════════════════════════════════════════════
+  Output per node: 15
+    [0:3]   displacements: ux, uz, θy
+    [3:6]   face +x forces: Fx, Fz, My
+    [6:9]   face -x forces: Fx, Fz, My
+    [9:12]  face +z forces: Fx, Fz, My
+    [12:15] face -z forces: Fx, Fz, My
+  Parameters: 754,191
+  Hard BCs: displacement + rotation
+  Face mask: unconnected faces → 0
+══════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════
+  TRAINING START
+  2 epochs, lr=0.001, device=cuda
+════════════════════════════════════════════════════════════
+
+  Epoch |      Total |       L_eq     L_free      L_sup |        L_N        L_M        L_V |   Disp Err
+  ---------------------------------------------------------------------------------------------------------
+
+  DIAGNOSTIC:
+    pred disp range:  [-0.000000e+00, 3.165100e-05]
+    pred disp / u_c:  [-0.0000, 0.4097]
+    face_forces range: [-2.212427e+01, 1.373787e+01]
+    face_forces / F_c: [-0.3579, 0.2223]
+    dux_dx range:     [-2.633421e-07, 6.384855e-08]
+    d2uz_dx2 range:   [-6.738409e-09, 8.203861e-10]
+    d3uz_dx3 range:   [-1.154279e-09, 4.338511e-10]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-2.6334e+02, 6.3849e+01]
+    EI * d2uz_dx2:    [-6.6739e-04, 8.2039e-05]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.380107e-05, 2.443300e-05]
+    pred disp / u_c:  [-0.3758, 0.0492]
+    face_forces range: [-6.953812e+00, 9.779572e+00]
+    face_forces / F_c: [-0.2367, 0.3329]
+    dux_dx range:     [5.286352e-08, 1.173819e-06]
+    d2uz_dx2 range:   [-5.404510e-09, 4.083805e-09]
+    d3uz_dx3 range:   [-1.901589e-09, 1.516005e-10]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [5.2864e+01, 1.1738e+03]
+    EI * d2uz_dx2:    [-5.4045e-04, 4.0838e-04]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.775380e-05, 4.402164e-05]
+    pred disp / u_c:  [-0.3134, 0.0106]
+    face_forces range: [-2.064245e+01, 2.440909e+01]
+    face_forces / F_c: [-0.2914, 0.3445]
+    dux_dx range:     [-1.507710e-06, -2.470491e-07]
+    d2uz_dx2 range:   [-1.309967e-08, -1.380077e-09]
+    d3uz_dx3 range:   [-5.621021e-10, 7.903800e-10]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.5077e+03, -2.4705e+02]
+    EI * d2uz_dx2:    [-1.3100e-03, -1.3801e-04]
+
+  DIAGNOSTIC:
+    pred disp range:  [-3.356009e-05, 2.539480e-05]
+    pred disp / u_c:  [-0.2859, 0.1050]
+    face_forces range: [-2.604348e+01, 3.304942e+01]
+    face_forces / F_c: [-0.2773, 0.3519]
+    dux_dx range:     [-3.907062e-08, 3.696706e-07]
+    d2uz_dx2 range:   [-8.000776e-09, -5.618191e-10]
+    d3uz_dx3 range:   [-2.532868e-10, 1.472236e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-3.9071e+01, 3.6967e+02]
+    EI * d2uz_dx2:    [-8.0008e-04, -5.6182e-05]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.938513e-05, 1.033709e-05]
+    pred disp / u_c:  [-0.2659, 0.0936]
+    face_forces range: [-1.942188e+01, 3.690097e+01]
+    face_forces / F_c: [-0.2197, 0.4174]
+    dux_dx range:     [-4.362294e-07, -7.946808e-08]
+    d2uz_dx2 range:   [-5.375583e-09, -5.520295e-10]
+    d3uz_dx3 range:   [-1.335746e-10, 9.116003e-12]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-4.3623e+02, -7.9468e+01]
+    EI * d2uz_dx2:    [-5.3756e-04, -5.5203e-05]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.988278e-05, 9.215969e-06]
+    pred disp / u_c:  [-0.2667, 0.1236]
+    face_forces range: [-1.395356e+01, 2.041320e+01]
+    face_forces / F_c: [-0.2339, 0.3422]
+    dux_dx range:     [-7.113918e-08, -1.306103e-08]
+    d2uz_dx2 range:   [-2.604616e-09, -2.317046e-10]
+    d3uz_dx3 range:   [6.750479e-12, 8.160086e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-7.1139e+01, -1.3061e+01]
+    EI * d2uz_dx2:    [-2.6046e-04, -2.3170e-05]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.627138e-05, 7.337240e-06]
+    pred disp / u_c:  [-0.2844, 0.1282]
+    face_forces range: [-1.300571e+01, 9.113808e+00]
+    face_forces / F_c: [-0.2841, 0.1991]
+    dux_dx range:     [5.227806e-09, 1.054279e-07]
+    d2uz_dx2 range:   [-2.214977e-09, -1.545535e-11]
+    d3uz_dx3 range:   [6.360166e-12, 8.263404e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [5.2278e+00, 1.0543e+02]
+    EI * d2uz_dx2:    [-2.2150e-04, -1.5455e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.804220e-05, 1.004958e-05]
+    pred disp / u_c:  [-0.2730, 0.0978]
+    face_forces range: [-2.984213e+01, 1.278018e+01]
+    face_forces / F_c: [-0.3631, 0.1555]
+    dux_dx range:     [7.087015e-09, 1.160480e-07]
+    d2uz_dx2 range:   [-3.358979e-09, 1.411018e-11]
+    d3uz_dx3 range:   [8.090250e-12, 1.159676e-10]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [7.0870e+00, 1.1605e+02]
+    EI * d2uz_dx2:    [-3.3590e-04, 1.4110e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-7.421147e-06, 2.223795e-06]
+    pred disp / u_c:  [-0.2648, 0.0793]
+    face_forces range: [-1.021977e+01, 3.815539e+00]
+    face_forces / F_c: [-0.4558, 0.1702]
+    dux_dx range:     [-1.473930e-08, -4.397535e-10]
+    d2uz_dx2 range:   [-7.266364e-10, -1.566398e-11]
+    d3uz_dx3 range:   [1.476380e-12, 2.075647e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.4739e+01, -4.3975e-01]
+    EI * d2uz_dx2:    [-7.2664e-05, -1.5664e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.398514e-05, 4.670981e-06]
+    pred disp / u_c:  [-0.2681, 0.0908]
+    face_forces range: [-1.935837e+01, 6.408339e+00]
+    face_forces / F_c: [-0.4703, 0.1557]
+    dux_dx range:     [-1.988382e-08, -1.241193e-09]
+    d2uz_dx2 range:   [-1.249493e-09, -6.485571e-12]
+    d3uz_dx3 range:   [2.042159e-12, 3.059826e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.9884e+01, -1.2412e+00]
+    EI * d2uz_dx2:    [-1.2495e-04, -6.4856e-07]
+      1 | 1.2598e+02 | 4.2145e-01 0.0000e+00 0.0000e+00 | 1.2543e+02 6.2058e-02 6.9366e-02 | 9.9658e-01
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.089072e-05, 9.098894e-06]
+    pred disp / u_c:  [-0.2704, 0.1178]
+    face_forces range: [-2.686009e+01, 8.336683e+00]
+    face_forces / F_c: [-0.4346, 0.1349]
+    dux_dx range:     [-9.196077e-10, 2.942918e-08]
+    d2uz_dx2 range:   [-1.864903e-09, 6.050061e-11]
+    d3uz_dx3 range:   [1.978723e-12, 4.140701e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-9.1961e-01, 2.9429e+01]
+    EI * d2uz_dx2:    [-1.8649e-04, 6.0501e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-9.675736e-06, 4.732506e-06]
+    pred disp / u_c:  [-0.2635, 0.1289]
+    face_forces range: [-1.204051e+01, 5.155150e+00]
+    face_forces / F_c: [-0.4098, 0.1755]
+    dux_dx range:     [-3.968238e-10, 1.345939e-08]
+    d2uz_dx2 range:   [-9.581053e-10, 2.712966e-11]
+    d3uz_dx3 range:   [6.032497e-13, 2.085624e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-3.9682e-01, 1.3459e+01]
+    EI * d2uz_dx2:    [-9.5811e-05, 2.7130e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.208440e-05, 1.132891e-05]
+    pred disp / u_c:  [-0.2494, 0.1279]
+    face_forces range: [-2.914310e+01, 1.597818e+01]
+    face_forces / F_c: [-0.4113, 0.2255]
+    dux_dx range:     [-1.513529e-09, 1.017824e-08]
+    d2uz_dx2 range:   [-2.400864e-09, 3.780409e-11]
+    d3uz_dx3 range:   [9.049703e-13, 4.921565e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.5135e+00, 1.0178e+01]
+    EI * d2uz_dx2:    [-2.4009e-04, 3.7804e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.779516e-05, 1.481706e-05]
+    pred disp / u_c:  [-0.2368, 0.1262]
+    face_forces range: [-3.874316e+01, 2.197452e+01]
+    face_forces / F_c: [-0.4126, 0.2340]
+    dux_dx range:     [-1.658338e-08, -1.693067e-09]
+    d2uz_dx2 range:   [-3.250546e-09, 4.106243e-11]
+    d3uz_dx3 range:   [5.664188e-13, 6.372691e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.6583e+01, -1.6931e+00]
+    EI * d2uz_dx2:    [-3.2505e-04, 4.1062e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.486904e-05, 1.298975e-05]
+    pred disp / u_c:  [-0.2251, 0.1176]
+    face_forces range: [-3.554254e+01, 1.797780e+01]
+    face_forces / F_c: [-0.4021, 0.2034]
+    dux_dx range:     [-1.480997e-08, -1.247268e-09]
+    d2uz_dx2 range:   [-3.082389e-09, 4.730065e-11]
+    d3uz_dx3 range:   [3.422653e-14, 5.791874e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-1.4810e+01, -1.2473e+00]
+    EI * d2uz_dx2:    [-3.0824e-04, 4.7301e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.591164e-05, 7.779298e-06]
+    pred disp / u_c:  [-0.2134, 0.1043]
+    face_forces range: [-2.294544e+01, 9.812358e+00]
+    face_forces / F_c: [-0.3847, 0.1645]
+    dux_dx range:     [-3.529862e-09, 1.447922e-09]
+    d2uz_dx2 range:   [-2.074958e-09, 3.780674e-11]
+    d3uz_dx3 range:   [-2.256022e-13, 3.693168e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-3.5299e+00, 1.4479e+00]
+    EI * d2uz_dx2:    [-2.0750e-04, 3.7807e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.181385e-05, 5.310529e-06]
+    pred disp / u_c:  [-0.2065, 0.0928]
+    face_forces range: [-1.715417e+01, 6.627483e+00]
+    face_forces / F_c: [-0.3748, 0.1448]
+    dux_dx range:     [-3.143373e-10, 6.149147e-09]
+    d2uz_dx2 range:   [-1.551564e-09, 3.097515e-11]
+    d3uz_dx3 range:   [-3.023440e-13, 2.650458e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-3.1434e-01, 5.9363e+00]
+    EI * d2uz_dx2:    [-1.5516e-04, 3.0975e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-2.060884e-05, 8.741586e-06]
+    pred disp / u_c:  [-0.2006, 0.0851]
+    face_forces range: [-3.196679e+01, 1.195584e+01]
+    face_forces / F_c: [-0.3890, 0.1455]
+    dux_dx range:     [-3.030756e-10, 1.888534e-08]
+    d2uz_dx2 range:   [-2.650491e-09, 5.567158e-11]
+    d3uz_dx3 range:   [-6.882805e-13, 4.657691e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-3.0308e-01, 1.8524e+01]
+    EI * d2uz_dx2:    [-2.6505e-04, 5.5672e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-5.585302e-06, 2.294134e-06]
+    pred disp / u_c:  [-0.1993, 0.0819]
+    face_forces range: [-8.859307e+00, 3.486620e+00]
+    face_forces / F_c: [-0.3951, 0.1555]
+    dux_dx range:     [-5.527865e-11, 5.270758e-09]
+    d2uz_dx2 range:   [-6.789714e-10, 1.532309e-11]
+    d3uz_dx3 range:   [-2.123130e-13, 1.083078e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-5.5279e-02, 5.1647e+00]
+    EI * d2uz_dx2:    [-6.7897e-05, 1.5323e-06]
+
+  DIAGNOSTIC:
+    pred disp range:  [-1.041631e-05, 4.115103e-06]
+    pred disp / u_c:  [-0.2024, 0.0800]
+    face_forces range: [-1.640604e+01, 6.764575e+00]
+    face_forces / F_c: [-0.3986, 0.1643]
+    dux_dx range:     [-9.766332e-11, 9.452353e-09]
+    d2uz_dx2 range:   [-1.169204e-09, 2.839820e-11]
+    d3uz_dx3 range:   [-4.124586e-13, 1.856936e-11]
+    EA range:         [1.0000e+09, 1.0000e+09]
+    EI range:         [1.0000e+05, 1.0000e+05]
+    EA * dux_dx:      [-9.7663e-02, 9.2746e+00]
+    EI * d2uz_dx2:    [-1.1692e-04, 2.8398e-06]
+
+  ---------------------------------------------------------------------------------------------------------
+  Training complete: 78.1s (39.03s/epoch)
+  Best total loss: 1.881931e-01
+  History saved: RESULTS\history.pt
+  Loss curves saved: RESULTS\loss_curves.png
+  Total loss saved: RESULTS\total_loss.png
+
+============================================================
+  RESULT ANALYSIS
+============================================================
+
+  Final losses (epoch 2):
+  --------------------------------------------------
+    L_eq       6.577807e-02  not converged
+    L_free     0.000000e+00  (hard constraint)
+    L_sup      0.000000e+00  (hard constraint)
+    L_N        3.461632e-02  not converged
+    L_M        4.709730e-03  partial
+    L_V        8.308893e-02  not converged
+    total      1.881931e-01  not converged
+
+  Best losses (epoch 2):
+t)
+    L_N        3.461632e-02  not converged
+    L_M        4.709730e-03  partial
+    L_V        8.308893e-02  not converged
+    total      1.881931e-01  not converged
+
+  Convergence analysis:
+  --------------------------------------------------
+
+  Displacement error vs Kratos: 9.9658e-01
+  Poor accuracy
+
+============================================================
+  TRAINING COMPLETE
+  Check RESULTS/ for results
+============================================================

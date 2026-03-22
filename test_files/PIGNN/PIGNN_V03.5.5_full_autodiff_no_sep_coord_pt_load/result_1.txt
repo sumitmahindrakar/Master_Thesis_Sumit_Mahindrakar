@@ -1,0 +1,148 @@
+#-----------------------------------------------------------------------------
+node input feature are raw coord not normalized
+#-----------------------------------------------------------------------------
+
+The node encoder receives mixed-scale inputs. Coordinates dominate (0–30) while loads are squashed to [0,1]. This causes:
+
+The network heavily biases toward coordinate features
+Load information is practically invisible to the first layer
+Training is unstable because gradients have wildly different magnitudes
+#-----------------------------------------------------------------------------
+what autograd actually computes is:
+
+Python
+
+grad_ux = autograd.grad(ux.sum(), coords)[0]
+# grad_ux[j, 0] = ∂(Σᵢ ux_i) / ∂(x_j) = Σᵢ ∂ux_i/∂x_j
+
+Due to message passing, ux_i depends on coordinates of ALL nodes, not just node i. So:
+
+text
+
+grad_ux[j, 0] = ∂ux_j/∂x_j          ← local (what you want)
+              + Σ_{i≠j} ∂ux_i/∂x_j   ← cross-terms from MP (noise!)
+
+This is NOT the local strain. The cross-terms contaminate everything. And it gets exponentially worse for higher derivatives
+#-----------------------------------------------------------------------------
+
+
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar\test_files\PIGNN\PIGNN_V03.5.5_full_autodiff_no_sep_coord_pt_load
+============================================================
+  PIGNN TRAINING — Autograd + Non-dim
+============================================================
+  Device: cuda
+
+── Loading data ──
+  Path: DATA/graph_dataset_norm.pt
+  Loaded 10 graphs
+  Physics scales present ✓
+
+  Data verification:
+    x range:        [0.0000, 1.0000]  (OK [0,1])
+    edge_attr range: [0.0000, 1.0000]  (OK [0,1])
+    coords range:   [0.00, 18.00]  (raw m)     
+    prop_E range:   [1.00e+10, 1.00e+10]  (raw Pa)
+    F_ext range:    [-61.81, 0.00]  (raw N)    
+    F_c  = 6.1808e+01  (char. force)
+    M_c  = 3.0904e+01  (char. moment)
+    u_c  = 7.7260e-05  (char. disp)
+    θ_c  = 1.5452e-04  (char. rot)
+  Nodes: 212, Elements: 216
+
+── Creating model ──
+
+══════════════════════════════════════════════════
+  PIGNN Model Summary
+══════════════════════════════════════════════════
+  Output per node: 15
+    [0:3]   displacements: ux, uz, θy
+    [3:6]   face +x forces: Fx, Fz, My
+    [6:9]   face -x forces: Fx, Fz, My
+    [9:12]  face +z forces: Fx, Fz, My
+    [12:15] face -z forces: Fx, Fz, My
+  Parameters: 754,191
+  Hard BCs: displacement + rotation
+  Face mask: unconnected faces → 0
+══════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════
+  TRAINING START
+  300 epochs, lr=0.001, device=cuda
+════════════════════════════════════════════════════════════
+
+  Epoch |      Total |       L_eq     L_free      L_sup |        L_N        L_M        L_V |   Disp Err
+  ---------------------------------------------------------------------------------------------------------
+      1 | 2.6539e+03 | 3.9529e-01 0.0000e+00 0.0000e+00 | 2.6534e+03 2.9664e-02 1.1577e-01 | 9.9964e-01
+     10 | 1.3140e-01 | 5.1019e-02 0.0000e+00 0.0000e+00 | 1.6692e-03 1.2254e-05 7.8699e-02 |     ---
+     20 | 1.2018e-01 | 3.9555e-02 0.0000e+00 0.0000e+00 | 5.5626e-03 3.4941e-05 7.5026e-02 |     ---
+   ---
+    100 | 1.3108e-01 | 5.1088e-02 0.0000e+00 0.0000e+00 | 1.0722e-03 5.1949e-06 7.8912e-02 | 9.9964e-01
+    110 | 1.2964e-01 | 4.9633e-02 0.0000e+00 0.0000e+00 | 1.0231e-03 5.1179e-06 7.8978e-02 |     ---
+    120 | 1.1807e-01 | 3.8525e-02 0.0000e+00 0.0000e+00 | 5.1288e-03 8.6414e-05 7.4330e-02 |     ---
+    130 | 1.1688e-01 | 3.7438e-02 0.0000e+00 0.0000e+00 | 6.2907e-03 5.0185e-06 7.3149e-02 |     ---
+    130 | 1.1688e-01 | 3.7438e-02 0.0000e+00 0.0000e+00 | 6.2907e-03 5.0185e-06 7.3149e-02 |     ---
+    140 | 1.1623e-01 | 3.7133e-02 0.0000e+00 0.0000e+00 | 6.0693e-03 8.8571e-06 7.3019e-02 |     ---
+    150 | 1.1586e-01 | 3.7060e-02 0.0000e+00 0.0000e+00 | 5.9682e-03 1.0365e-05 7.2825e-02 | 9.9926e-01
+    160 | 1.1567e-01 | 3.7036e-02 0.0000e+00 0.0000e+00 | 5.8953e-03 8.7113e-06 7.2725e-02 |     ---
+    170 | 1.1559e-01 | 3.7097e-02 0.0000e+00 0.0000e+00 | 5.8741e-03 7.7124e-06 7.2609e-02 |     ---
+    180 | 1.1557e-01 | 3.7112e-02 0.0000e+00 0.0000e+00 | 5.8983e-03 6.3433e-06 7.2555e-02 |     ---
+    190 | 1.1553e-01 | 3.7119e-02 0.0000e+00 0.0000e+00 | 5.8765e-03 4.8918e-06 7.2531e-02 |     ---
+    200 | 1.1567e-01 | 3.7139e-02 0.0000e+00 0.0000e+00 | 6.0191e-03 4.1345e-06 7.2509e-02 | 9.9906e-01
+    210 | 1.1551e-01 | 3.7140e-02 0.0000e+00 0.0000e+00 | 5.8783e-03 3.2306e-06 7.2485e-02 |     ---
+    220 | 1.1550e-01 | 3.7148e-02 0.0000e+00 0.0000e+00 | 5.8788e-03 2.8179e-06 7.2475e-02 |     ---
+    230 | 1.1550e-01 | 3.7150e-02 0.0000e+00 0.0000e+00 | 5.8775e-03 2.3965e-06 7.2471e-02 |     ---
+    240 | 1.1550e-01 | 3.7152e-02 0.0000e+00 0.0000e+00 | 5.8760e-03 2.0704e-06 7.2468e-02 |     ---
+    250 | 1.1550e-01 | 3.7157e-02 0.0000e+00 0.0000e+00 | 5.8751e-03 1.8467e-06 7.2462e-02 | 9.9904e-01
+    260 | 1.1549e-01 | 3.7155e-02 0.0000e+00 0.0000e+00 | 5.8759e-03 1.6708e-06 7.2462e-02 |     ---
+    270 | 1.1550e-01 | 3.7155e-02 0.0000e+00 0.0000e+00 | 5.8790e-03 1.5224e-06 7.2461e-02 |     ---
+    280 | 1.1549e-01 | 3.7155e-02 0.0000e+00 0.0000e+00 | 5.8767e-03 1.4421e-06 7.2459e-02 |     ---
+    290 | 1.1549e-01 | 3.7153e-02 0.0000e+00 0.0000e+00 | 5.8808e-03 1.2805e-06 7.2459e-02 |     ---
+    300 | 1.1549e-01 | 3.7156e-02 0.0000e+00 0.0000e+00 | 5.8772e-03 1.2168e-06 7.2456e-02 | 9.9903e-01
+
+  ---------------------------------------------------------------------------------------------------------
+  Training complete: 1833.1s (6.11s/epoch)     
+  Best total loss: 1.154876e-01
+  History saved: RESULTS\history.pt
+  Loss curves saved: RESULTS\loss_curves.png
+  Total loss saved: RESULTS\total_loss.png
+
+============================================================
+  RESULT ANALYSIS
+============================================================
+
+  Final losses (epoch 300):
+  --------------------------------------------------
+    L_eq       3.715605e-02  not converged     
+    L_free     0.000000e+00  (hard constraint) 
+    L_sup      0.000000e+00  (hard constraint) 
+    L_N        5.877174e-03  partial
+    L_M        1.216831e-06  partial
+    L_V        7.245620e-02  not converged     
+    total      1.154906e-01  not converged     
+
+  Best losses (epoch 299):
+  --------------------------------------------------
+    L_eq       3.715439e-02  not converged     
+    L_free     0.000000e+00  (hard constraint) 
+    L_sup      0.000000e+00  (hard constraint) 
+    L_N        5.875253e-03  partial
+    L_M        1.202961e-06  partial
+    L_V        7.245678e-02  not converged     
+    total      1.154876e-01  not converged     
+
+  Convergence analysis:
+  --------------------------------------------------
+    L_eq       first10=9.6844e-02 last10=3.7156e-02  SLOW (<10x reduction)
+    L_free     first10=0.0000e+00 last10=0.0000e+00  CONVERGED (>100x reduction)
+    L_sup      first10=0.0000e+00 last10=0.0000e+00  CONVERGED (>100x reduction)
+    L_N        first10=2.6582e+02 last10=5.8792e-03  CONVERGED (>100x reduction)
+
+  Displacement error vs Kratos: 9.9903e-01
+  Poor accuracy
+
+============================================================
+  TRAINING COMPLETE
+  Check RESULTS/ for results
+============================================================

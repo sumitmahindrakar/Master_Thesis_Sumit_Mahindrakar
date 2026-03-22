@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
-import re
+from typing import Dict, List, Tuple, Optional, Set
 
 
 @dataclass
@@ -21,17 +20,17 @@ class MdpaData:
     elements: Dict[int, dict] = field(default_factory=dict)
     element_type: str = ""
     elemental_data: Dict[str, Dict[int, str]] = field(default_factory=dict)
+    # ── NEW: two separate condition dicts ──
+    conditions_force: Dict[int, dict] = field(default_factory=dict)
+    conditions_moment: Dict[int, dict] = field(default_factory=dict)
+    # ── Keep legacy for backward compat ──
     conditions: Dict[int, dict] = field(default_factory=dict)
     condition_type: str = ""
-    condition_num_nodes: int = 2
     sub_model_parts: Dict[str, SubModelPart] = field(default_factory=dict)
-
-
-def detect_condition_nodes(condition_type: str) -> int:
-    match = re.search(r'(\d)N', condition_type)
-    if match:
-        return int(match.group(1))
-    return 2
+    # ── NEW: per-node SMP mapping ──
+    per_node_smps: Dict[int, Dict[str, str]] = field(default_factory=dict)  # node_id → smp_name
+    # node_id → {'force': 'AutoForce_node_X', 'moment': 'AutoMoment_node_X'}
+    condition_node_list: List[int] = field(default_factory=list)  # ordered eligible nodes
 
 
 def _parse_sub_model_part(lines, i):
@@ -39,14 +38,11 @@ def _parse_sub_model_part(lines, i):
     smp_name = line.split("Begin SubModelPart")[1].strip().split("//")[0].strip()
     smp = SubModelPart(name=smp_name)
     i += 1
-
     while i < len(lines):
         smp_line = lines[i].strip()
-
         if smp_line.startswith("End SubModelPart"):
             i += 1
             return smp, i
-
         if smp_line.startswith("Begin SubModelPartNodes"):
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("End SubModelPartNodes"):
@@ -56,7 +52,6 @@ def _parse_sub_model_part(lines, i):
                 i += 1
             i += 1
             continue
-
         if smp_line.startswith("Begin SubModelPartElements"):
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("End SubModelPartElements"):
@@ -66,7 +61,6 @@ def _parse_sub_model_part(lines, i):
                 i += 1
             i += 1
             continue
-
         if smp_line.startswith("Begin SubModelPartConditions"):
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("End SubModelPartConditions"):
@@ -76,31 +70,24 @@ def _parse_sub_model_part(lines, i):
                 i += 1
             i += 1
             continue
-
         if smp_line.startswith("Begin SubModelPart"):
             child_smp, i = _parse_sub_model_part(lines, i)
             smp.sub_model_parts[child_smp.name] = child_smp
             continue
-
         i += 1
-
     return smp, i
 
 
 def parse_mdpa(filename: str) -> MdpaData:
     with open(filename, 'r') as f:
         lines = f.readlines()
-
     data = MdpaData()
     i = 0
-
     while i < len(lines):
         line = lines[i].strip()
-
         if not line:
             i += 1
             continue
-
         if line.startswith("Begin ModelPartData"):
             while i < len(lines) and not lines[i].strip().startswith("End ModelPartData"):
                 data.model_part_data.append(lines[i])
@@ -108,7 +95,6 @@ def parse_mdpa(filename: str) -> MdpaData:
             data.model_part_data.append(lines[i])
             i += 1
             continue
-
         if line.startswith("Begin Properties"):
             while i < len(lines) and not lines[i].strip().startswith("End Properties"):
                 data.properties.append(lines[i])
@@ -116,7 +102,6 @@ def parse_mdpa(filename: str) -> MdpaData:
             data.properties.append(lines[i])
             i += 1
             continue
-
         if line.startswith("Begin Nodes"):
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("End Nodes"):
@@ -124,13 +109,12 @@ def parse_mdpa(filename: str) -> MdpaData:
                 if node_line and not node_line.startswith("//"):
                     parts = node_line.split()
                     if len(parts) >= 4:
-                        node_id = int(parts[0])
-                        x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
-                        data.nodes[node_id] = (x, y, z)
+                        data.nodes[int(parts[0])] = (
+                            float(parts[1]), float(parts[2]), float(parts[3])
+                        )
                 i += 1
             i += 1
             continue
-
         if line.startswith("Begin Elements"):
             parts = line.split("Begin Elements")
             if len(parts) > 1:
@@ -141,14 +125,13 @@ def parse_mdpa(filename: str) -> MdpaData:
                 if elem_line and not elem_line.startswith("//"):
                     parts = elem_line.split()
                     if len(parts) >= 4:
-                        elem_id = int(parts[0])
-                        prop_id = int(parts[1])
-                        nodes = [int(p) for p in parts[2:]]
-                        data.elements[elem_id] = {'property': prop_id, 'nodes': nodes}
+                        data.elements[int(parts[0])] = {
+                            'property': int(parts[1]),
+                            'nodes': [int(p) for p in parts[2:]]
+                        }
                 i += 1
             i += 1
             continue
-
         if line.startswith("Begin ElementalData"):
             data_name = line.split("Begin ElementalData")[1].strip().split("//")[0].strip()
             if data_name not in data.elemental_data:
@@ -159,90 +142,58 @@ def parse_mdpa(filename: str) -> MdpaData:
                 if elem_line and not elem_line.startswith("//"):
                     parts = elem_line.split(None, 1)
                     if len(parts) >= 2:
-                        elem_id = int(parts[0])
-                        value = parts[1]
-                        data.elemental_data[data_name][elem_id] = value
+                        data.elemental_data[data_name][int(parts[0])] = parts[1]
                 i += 1
             i += 1
             continue
-
         if line.startswith("Begin Conditions"):
             parts = line.split("Begin Conditions")
             if len(parts) > 1:
                 data.condition_type = parts[1].strip().split("//")[0].strip()
-                data.condition_num_nodes = detect_condition_nodes(data.condition_type)
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("End Conditions"):
                 cond_line = lines[i].strip()
                 if cond_line and not cond_line.startswith("//"):
                     parts = cond_line.split()
-                    if len(parts) >= 2 + data.condition_num_nodes:
-                        cond_id = int(parts[0])
-                        prop_id = int(parts[1])
-                        nodes = [int(parts[j]) for j in range(2, 2 + data.condition_num_nodes)]
-                        data.conditions[cond_id] = {'property': prop_id, 'nodes': nodes}
+                    if len(parts) >= 3:
+                        data.conditions[int(parts[0])] = {
+                            'property': int(parts[1]),
+                            'nodes': [int(p) for p in parts[2:]]
+                        }
                 i += 1
             i += 1
             continue
-
         if line.startswith("Begin SubModelPart"):
             smp, i = _parse_sub_model_part(lines, i)
             data.sub_model_parts[smp.name] = smp
             continue
-
         i += 1
-
     return data
 
 
-def _refine_smp(smp, node_id_mapping, intermediate_nodes_per_elem,
-                old_to_new_elements, old_to_new_conditions,
-                refined_elements, refined_conditions):
-    new_smp = SubModelPart(name=smp.name)
-
-    # Start with mapped original nodes
-    for old_node in smp.nodes:
-        if old_node in node_id_mapping:
-            new_smp.nodes.append(node_id_mapping[old_node])
-
-    # Map elements
-    for old_elem_id in smp.elements:
-        if old_elem_id in old_to_new_elements:
-            new_smp.elements.extend(old_to_new_elements[old_elem_id])
-    new_smp.elements = sorted(new_smp.elements)
-
-    # Map conditions
-    for old_cond_id in smp.conditions:
-        if old_cond_id in old_to_new_conditions:
-            new_smp.conditions.extend(old_to_new_conditions[old_cond_id])
-    new_smp.conditions = sorted(new_smp.conditions)
-
-    # Add all nodes from refined elements in this SMP
-    for elem_id in new_smp.elements:
-        if elem_id in refined_elements:
-            new_smp.nodes.extend(refined_elements[elem_id]['nodes'])
-
-    # Add all nodes from refined conditions in this SMP
-    for cond_id in new_smp.conditions:
-        if cond_id in refined_conditions:
-            new_smp.nodes.extend(refined_conditions[cond_id]['nodes'])
-
-    # Deduplicate and sort
-    new_smp.nodes = sorted(set(new_smp.nodes))
-
-    # Recurse for children
-    for child_name, child_smp in smp.sub_model_parts.items():
-        new_smp.sub_model_parts[child_name] = _refine_smp(
-            child_smp, node_id_mapping, intermediate_nodes_per_elem,
-            old_to_new_elements, old_to_new_conditions,
-            refined_elements, refined_conditions
-        )
-
-    return new_smp
+def _find_support_nodes(data: MdpaData) -> Set[int]:
+    """Auto-detect support nodes from DISPLACEMENT_support."""
+    support: Set[int] = set()
+    for name, smp in data.sub_model_parts.items():
+        if "DISPLACEMENT" in name:
+            support.update(smp.nodes)
+    return support
 
 
-def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
-    original_node_ids = sorted(data.nodes.keys())
+def refine_mesh(
+    data: MdpaData,
+    subdivisions: int,
+    beam_element_ids: Optional[List[int]] = None,
+    generate_moment_conditions: bool = False 
+) -> MdpaData:
+    """
+    Refine mesh with per-node SubModelParts for individual load application.
+
+    Generates:
+      - PointLoadCondition3D1N for force (Fx, Fz)
+      - PointMomentCondition3D1N for moment (My)
+      - Per-node SubModelPart (AutoLoad_node_X) for each eligible node
+    """
     original_elem_ids = sorted(data.elements.keys())
 
     refined = MdpaData()
@@ -250,162 +201,253 @@ def refine_mesh(data: MdpaData, subdivisions: int) -> MdpaData:
     refined.model_part_data = data.model_part_data.copy()
     refined.properties = data.properties.copy()
     refined.element_type = data.element_type
-    refined.condition_type = data.condition_type
-    refined.condition_num_nodes = data.condition_num_nodes
+    refined.condition_type = "PointLoadCondition3D1N"
 
-    node_id_mapping: Dict[int, int] = {}
-    intermediate_nodes_per_elem: Dict[int, List[int]] = {}
+    support_nodes = _find_support_nodes(data)
+    if support_nodes:
+        print(f"      Support nodes (auto): {sorted(support_nodes)}")
 
-    # ── Phase 1: generate all nodes with TEMPORARY ids ──────────────
-    temp_nodes: Dict[int, Tuple[float, float, float]] = {}
-    next_temp_id = 1
-    seen_original_nodes = set()
+    if beam_element_ids:
+        print(f"      Beam elements (config): {beam_element_ids}")
+    else:
+        print(f"      Beam elements: ALL (no filter)")
 
-    for old_elem_id in original_elem_ids:
-        elem = data.elements[old_elem_id]
-        n1_old, n2_old = elem['nodes']
+    smps_with_conditions = {
+        name for name, smp in data.sub_model_parts.items() if smp.conditions
+    }
 
-        if n1_old not in seen_original_nodes:
-            seen_original_nodes.add(n1_old)
-            node_id_mapping[n1_old] = next_temp_id
-            temp_nodes[next_temp_id] = data.nodes[n1_old]
-            next_temp_id += 1
+    # ── 1. Nodes ──
+    node_map: Dict[int, int] = {}
+    intermediates: Dict[int, List[int]] = {}
+    next_id = 1
+    seen: Set[int] = set()
 
-        p1 = data.nodes[n1_old]
-        p2 = data.nodes[n2_old]
-
-        new_intermediate_ids = []
+    for eid in original_elem_ids:
+        n1, n2 = data.elements[eid]['nodes']
+        if n1 not in seen:
+            seen.add(n1)
+            node_map[n1] = next_id
+            refined.nodes[next_id] = data.nodes[n1]
+            next_id += 1
+        p1, p2 = data.nodes[n1], data.nodes[n2]
+        mid_ids = []
         for j in range(1, subdivisions):
             t = j / subdivisions
-            x = p1[0] + t * (p2[0] - p1[0])
-            y = p1[1] + t * (p2[1] - p1[1])
-            z = p1[2] + t * (p2[2] - p1[2])
-            temp_nodes[next_temp_id] = (x, y, z)
-            new_intermediate_ids.append(next_temp_id)
-            next_temp_id += 1
+            refined.nodes[next_id] = (
+                p1[0] + t * (p2[0] - p1[0]),
+                p1[1] + t * (p2[1] - p1[1]),
+                p1[2] + t * (p2[2] - p1[2])
+            )
+            mid_ids.append(next_id)
+            next_id += 1
+        intermediates[eid] = mid_ids
+        if n2 not in seen:
+            seen.add(n2)
+            node_map[n2] = next_id
+            refined.nodes[next_id] = data.nodes[n2]
+            next_id += 1
 
-        intermediate_nodes_per_elem[old_elem_id] = new_intermediate_ids
+    new_support = {node_map[n] for n in support_nodes if n in node_map}
 
-        if n2_old not in seen_original_nodes:
-            seen_original_nodes.add(n2_old)
-            node_id_mapping[n2_old] = next_temp_id
-            temp_nodes[next_temp_id] = data.nodes[n2_old]
-            next_temp_id += 1
+    # ── 2. Elements ──
+    next_eid = 1
+    old_to_new: Dict[int, List[int]] = {}
 
-    # ── Phase 2: sort by coordinates (x, y, z) and renumber ────────
-    sorted_temp_ids = sorted(temp_nodes.keys(),
-                             key=lambda nid: temp_nodes[nid])
-
-    temp_to_final: Dict[int, int] = {}
-    for final_id, temp_id in enumerate(sorted_temp_ids, start=1):
-        temp_to_final[temp_id] = final_id
-        refined.nodes[final_id] = temp_nodes[temp_id]
-
-    # propagate the renumbering into our two look-up structures
-    for old_node in list(node_id_mapping):
-        node_id_mapping[old_node] = temp_to_final[node_id_mapping[old_node]]
-
-    for old_elem_id in intermediate_nodes_per_elem:
-        intermediate_nodes_per_elem[old_elem_id] = [
-            temp_to_final[t]
-            for t in intermediate_nodes_per_elem[old_elem_id]
-        ]
-
-    # ── Phase 3: create refined elements ────────────────────────────
-    next_elem_id = 1
-    old_to_new_elements: Dict[int, List[int]] = {}
-
-    for old_elem_id in original_elem_ids:
-        elem = data.elements[old_elem_id]
-        n1_old, n2_old = elem['nodes']
-
-        n1_new = node_id_mapping[n1_old]
-        n2_new = node_id_mapping[n2_old]
-        intermediate = intermediate_nodes_per_elem[old_elem_id]
-
-        all_nodes = [n1_new] + intermediate + [n2_new]
-
-        new_elem_ids = []
+    for eid in original_elem_ids:
+        n1, n2 = data.elements[eid]['nodes']
+        all_n = [node_map[n1]] + intermediates[eid] + [node_map[n2]]
+        new_ids = []
         for j in range(subdivisions):
-            refined.elements[next_elem_id] = {
-                'property': elem['property'],
-                'nodes': [all_nodes[j], all_nodes[j + 1]]
+            refined.elements[next_eid] = {
+                'property': data.elements[eid]['property'],
+                'nodes': [all_n[j], all_n[j + 1]]
             }
-            new_elem_ids.append(next_elem_id)
-            next_elem_id += 1
+            new_ids.append(next_eid)
+            next_eid += 1
+        old_to_new[eid] = new_ids
 
-        old_to_new_elements[old_elem_id] = new_elem_ids
+    for dname, edata in data.elemental_data.items():
+        refined.elemental_data[dname] = {}
+        for old_eid, val in edata.items():
+            for new_eid in old_to_new.get(old_eid, []):
+                refined.elemental_data[dname][new_eid] = val
 
-    # elemental data
-    for data_name, elem_data in data.elemental_data.items():
-        refined.elemental_data[data_name] = {}
-        for old_elem_id, value in elem_data.items():
-            for new_elem_id in old_to_new_elements.get(old_elem_id, []):
-                refined.elemental_data[data_name][new_elem_id] = value
+    # ── 3. Determine eligible nodes (beam nodes minus supports) ──
+    if beam_element_ids:
+        beam_nodes: Set[int] = set()
+        for old_eid in beam_element_ids:
+            if old_eid in old_to_new:
+                for new_eid in old_to_new[old_eid]:
+                    beam_nodes.update(refined.elements[new_eid]['nodes'])
+        condition_nodes = sorted(beam_nodes - new_support)
+        print(f"      Beam nodes: {len(beam_nodes)}, "
+              f"after excluding supports: {len(condition_nodes)}")
+    else:
+        condition_nodes = sorted(set(refined.nodes.keys()) - new_support)
+        print(f"      All nodes minus supports: {len(condition_nodes)}")
 
-    # ── Phase 4: create refined conditions ──────────────────────────
-    next_cond_id = 1
-    old_to_new_conditions: Dict[int, List[int]] = {}
-    sorted_cond_ids = sorted(data.conditions.keys())
+    refined.condition_node_list = condition_nodes
 
-    for old_cond_id in sorted_cond_ids:
-        cond = data.conditions[old_cond_id]
+    # ── 4. Dual conditions: PointLoad + PointMoment per node ──
+    # force_cond_id = 1
+    # moment_cond_id_start = len(condition_nodes) + 1
+    # moment_cond_id = moment_cond_id_start
 
-        if data.condition_num_nodes == 1:
-            old_node = cond['nodes'][0]
-            new_node = node_id_mapping[old_node]
-            refined.conditions[next_cond_id] = {
-                'property': cond['property'],
-                'nodes': [new_node]
+    # all_force_cond_ids = []
+    # all_moment_cond_ids = []
+
+    # for nid in condition_nodes:
+    #     # Force condition
+    #     refined.conditions_force[force_cond_id] = {
+    #         'property': 0, 'nodes': [nid]
+    #     }
+    #     all_force_cond_ids.append(force_cond_id)
+    #     force_cond_id += 1
+
+    #     # Moment condition
+    #     refined.conditions_moment[moment_cond_id] = {
+    #         'property': 0, 'nodes': [nid]
+    #     }
+    #     all_moment_cond_ids.append(moment_cond_id)
+    #     moment_cond_id += 1
+
+    # # Combined for legacy .conditions dict
+    # refined.conditions = {}
+    # for cid, cdata in refined.conditions_force.items():
+    #     refined.conditions[cid] = cdata
+    # for cid, cdata in refined.conditions_moment.items():
+    #     refined.conditions[cid] = cdata
+
+    # all_cond_ids = all_force_cond_ids + all_moment_cond_ids
+
+    # print(f"      Force conditions: {len(all_force_cond_ids)} "
+    #       f"(IDs {all_force_cond_ids[0]}-{all_force_cond_ids[-1]})")
+    # print(f"      Moment conditions: {len(all_moment_cond_ids)} "
+    #       f"(IDs {all_moment_cond_ids[0]}-{all_moment_cond_ids[-1]})")
+
+    # # ── 5. Per-node SubModelParts ──
+    # # for idx, nid in enumerate(condition_nodes):
+    # #     smp_name = f"AutoLoad_node_{nid}"
+    # #     force_cid = all_force_cond_ids[idx]
+    # #     moment_cid = all_moment_cond_ids[idx]
+
+    # #     smp = SubModelPart(
+    # #         name=smp_name,
+    # #         nodes=[nid],
+    # #         elements=[],
+    # #         conditions=[force_cid, moment_cid]
+    # #     )
+    # #     refined.sub_model_parts[smp_name] = smp
+    # #     refined.per_node_smps[nid] = smp_name
+
+    # # print(f"      Per-node SubModelParts: {len(refined.per_node_smps)}")
+    # for idx, nid in enumerate(condition_nodes):
+    #     force_smp_name = f"AutoForce_node_{nid}"
+    #     moment_smp_name = f"AutoMoment_node_{nid}"
+    #     force_cid = all_force_cond_ids[idx]
+    #     moment_cid = all_moment_cond_ids[idx]
+
+    #     refined.sub_model_parts[force_smp_name] = SubModelPart(
+    #         name=force_smp_name, nodes=[nid], elements=[], conditions=[force_cid]
+    #     )
+    #     refined.sub_model_parts[moment_smp_name] = SubModelPart(
+    #         name=moment_smp_name, nodes=[nid], elements=[], conditions=[moment_cid]
+    #     )
+    #     refined.per_node_smps[nid] = {
+    #         'force': force_smp_name,
+    #         'moment': moment_smp_name
+    #     }
+
+    # print(f"      Per-node SubModelParts: {len(refined.per_node_smps)} nodes "
+    #       f"× 2 (force+moment) = {len(refined.per_node_smps)*2} SMPs")
+
+    # ── 4. Conditions ──
+    force_cond_id = 1
+    all_force_cond_ids = []
+    all_moment_cond_ids = []
+
+    for nid in condition_nodes:
+        refined.conditions_force[force_cond_id] = {
+            'property': 0, 'nodes': [nid]
+        }
+        all_force_cond_ids.append(force_cond_id)
+        force_cond_id += 1
+
+    if generate_moment_conditions:
+        moment_cond_id = force_cond_id
+        for nid in condition_nodes:
+            refined.conditions_moment[moment_cond_id] = {
+                'property': 0, 'nodes': [nid]
             }
-            old_to_new_conditions[old_cond_id] = [next_cond_id]
-            next_cond_id += 1
-        else:
-            n1_old, n2_old = cond['nodes']
+            all_moment_cond_ids.append(moment_cond_id)
+            moment_cond_id += 1
 
-            found_elem = None
-            for oe_id in original_elem_ids:
-                e = data.elements[oe_id]
-                if set(e['nodes']) == {n1_old, n2_old}:
-                    found_elem = oe_id
-                    break
+    # Combined for legacy
+    refined.conditions = {}
+    for cid, cdata in refined.conditions_force.items():
+        refined.conditions[cid] = cdata
+    for cid, cdata in refined.conditions_moment.items():
+        refined.conditions[cid] = cdata
 
-            if found_elem is not None:
-                elem = data.elements[found_elem]
-                n1_new = node_id_mapping[n1_old]
-                n2_new = node_id_mapping[n2_old]
-                intermediate = intermediate_nodes_per_elem[found_elem]
+    all_cond_ids = all_force_cond_ids + all_moment_cond_ids
 
-                if elem['nodes'][0] == n1_old:
-                    all_nodes = [n1_new] + intermediate + [n2_new]
-                else:
-                    all_nodes = [n2_new] + intermediate + [n1_new]
+    print(f"      Force conditions: {len(all_force_cond_ids)} "
+          f"(IDs {all_force_cond_ids[0]}-{all_force_cond_ids[-1]})")
+    if generate_moment_conditions:
+        print(f"      Moment conditions: {len(all_moment_cond_ids)} "
+              f"(IDs {all_moment_cond_ids[0]}-{all_moment_cond_ids[-1]})")
+    else:
+        print(f"      Moment conditions: DISABLED")
 
-                new_cond_ids = []
-                for j in range(subdivisions):
-                    refined.conditions[next_cond_id] = {
-                        'property': cond['property'],
-                        'nodes': [all_nodes[j], all_nodes[j + 1]]
-                    }
-                    new_cond_ids.append(next_cond_id)
-                    next_cond_id += 1
-                old_to_new_conditions[old_cond_id] = new_cond_ids
-            else:
-                new_nodes = [node_id_mapping[n] for n in cond['nodes']]
-                refined.conditions[next_cond_id] = {
-                    'property': cond['property'],
-                    'nodes': new_nodes
-                }
-                old_to_new_conditions[old_cond_id] = [next_cond_id]
-                next_cond_id += 1
+    # ── 5. Per-node SubModelParts ──
+    for idx, nid in enumerate(condition_nodes):
+        force_smp_name = f"AutoForce_node_{nid}"
+        force_cid = all_force_cond_ids[idx]
 
-    # ── Phase 5: SubModelParts ──────────────────────────────────────
-    for smp_name, smp in data.sub_model_parts.items():
-        refined.sub_model_parts[smp_name] = _refine_smp(
-            smp, node_id_mapping, intermediate_nodes_per_elem,
-            old_to_new_elements, old_to_new_conditions,
-            refined.elements, refined.conditions
+        refined.sub_model_parts[force_smp_name] = SubModelPart(
+            name=force_smp_name, nodes=[nid],
+            elements=[], conditions=[force_cid]
         )
+
+        if generate_moment_conditions:
+            moment_smp_name = f"AutoMoment_node_{nid}"
+            moment_cid = all_moment_cond_ids[idx]
+            refined.sub_model_parts[moment_smp_name] = SubModelPart(
+                name=moment_smp_name, nodes=[nid],
+                elements=[], conditions=[moment_cid]
+            )
+            refined.per_node_smps[nid] = {
+                'force': force_smp_name,
+                'moment': moment_smp_name
+            }
+        else:
+            refined.per_node_smps[nid] = {
+                'force': force_smp_name
+            }
+
+    n_smps = len(condition_nodes) * (2 if generate_moment_conditions else 1)
+    print(f"      Per-node SubModelParts: {n_smps}")
+
+    # ── 6. Original SubModelParts (updated) ──
+    for smp_name, smp in data.sub_model_parts.items():
+        new_smp = SubModelPart(name=smp_name)
+        for old_n in smp.nodes:
+            if old_n in node_map:
+                new_smp.nodes.append(node_map[old_n])
+        for old_eid in smp.elements:
+            if old_eid in old_to_new:
+                new_smp.elements.extend(old_to_new[old_eid])
+                for new_eid in old_to_new[old_eid]:
+                    new_smp.nodes.extend(refined.elements[new_eid]['nodes'])
+
+        if smp_name in smps_with_conditions:
+            new_smp.conditions = list(all_cond_ids)
+            new_smp.nodes.extend(condition_nodes)
+
+        new_smp.nodes = sorted(set(new_smp.nodes))
+        new_smp.elements = sorted(new_smp.elements)
+        new_smp.conditions = sorted(new_smp.conditions)
+        refined.sub_model_parts[smp_name] = new_smp
 
     return refined
 
@@ -414,74 +456,93 @@ def _write_smp(f, smp, indent=""):
     f.write(f"{indent}Begin SubModelPart {smp.name}\n")
     inner = indent + "    "
     inner2 = inner + "    "
-
     f.write(f"{inner}Begin SubModelPartNodes\n")
-    for node_id in sorted(smp.nodes):
-        f.write(f"{inner2}{node_id}\n")
+    for nid in sorted(smp.nodes):
+        f.write(f"{inner2}{nid}\n")
     f.write(f"{inner}End SubModelPartNodes\n")
-
     f.write(f"{inner}Begin SubModelPartElements\n")
-    for elem_id in sorted(smp.elements):
-        f.write(f"{inner2}{elem_id}\n")
+    for eid in sorted(smp.elements):
+        f.write(f"{inner2}{eid}\n")
     f.write(f"{inner}End SubModelPartElements\n")
-
     f.write(f"{inner}Begin SubModelPartConditions\n")
-    for cond_id in sorted(smp.conditions):
-        f.write(f"{inner2}{cond_id}\n")
+    for cid in sorted(smp.conditions):
+        f.write(f"{inner2}{cid}\n")
     f.write(f"{inner}End SubModelPartConditions\n")
-
     for child_name, child_smp in smp.sub_model_parts.items():
         f.write("\n")
         _write_smp(f, child_smp, inner)
-
     f.write(f"{indent}End SubModelPart\n")
 
 
 def write_mdpa(data: MdpaData, filename: str):
     with open(filename, 'w') as f:
+        # Model part data
         if data.model_part_data:
             for line in data.model_part_data:
                 f.write(line if line.endswith('\n') else line + '\n')
         else:
-            f.write("Begin ModelPartData\n")
-            f.write("End ModelPartData\n")
+            f.write("Begin ModelPartData\nEnd ModelPartData\n")
         f.write("\n")
 
+        # Properties
         if data.properties:
             for line in data.properties:
                 f.write(line if line.endswith('\n') else line + '\n')
         else:
-            f.write("Begin Properties 1\n")
-            f.write("End Properties\n")
+            f.write("Begin Properties 0\nEnd Properties\n")
         f.write("\n")
 
+        # Nodes
         f.write("Begin Nodes\n")
-        for node_id in sorted(data.nodes.keys()):
-            x, y, z = data.nodes[node_id]
-            f.write(f"    {node_id}   {x:.10f}   {y:.10f}   {z:.10f}\n")
+        for nid in sorted(data.nodes.keys()):
+            x, y, z = data.nodes[nid]
+            f.write(f"    {nid}   {x:.10f}   {y:.10f}   {z:.10f}\n")
         f.write("End Nodes\n\n")
 
+        # Elements
         f.write(f"Begin Elements {data.element_type}\n")
-        for elem_id in sorted(data.elements.keys()):
-            elem = data.elements[elem_id]
-            nodes_str = "   ".join(str(n) for n in elem['nodes'])
-            f.write(f"    {elem_id}   {elem['property']}   {nodes_str}\n")
+        for eid in sorted(data.elements.keys()):
+            e = data.elements[eid]
+            f.write(f"    {eid}   {e['property']}   "
+                    f"{'   '.join(str(n) for n in e['nodes'])}\n")
         f.write("End Elements\n\n")
 
-        for data_name, elem_data in data.elemental_data.items():
-            f.write(f"Begin ElementalData {data_name}\n")
-            for elem_id in sorted(elem_data.keys()):
-                f.write(f"    {elem_id} {elem_data[elem_id]}\n")
+        # Elemental data
+        for dname, edata in data.elemental_data.items():
+            f.write(f"Begin ElementalData {dname}\n")
+            for eid in sorted(edata.keys()):
+                f.write(f"    {eid} {edata[eid]}\n")
             f.write("End ElementalData\n\n")
 
-        if data.conditions:
-            f.write(f"Begin Conditions {data.condition_type}\n")
-            for cond_id in sorted(data.conditions.keys()):
-                cond = data.conditions[cond_id]
-                nodes_str = " ".join(str(n) for n in cond['nodes'])
-                f.write(f"    {cond_id} {cond['property']} {nodes_str}\n")
+        # ── Force conditions ──
+        if data.conditions_force:
+            f.write("Begin Conditions PointLoadCondition3D1N\n")
+            for cid in sorted(data.conditions_force.keys()):
+                c = data.conditions_force[cid]
+                f.write(f"    {cid} {c['property']} "
+                        f"{' '.join(str(n) for n in c['nodes'])}\n")
             f.write("End Conditions\n\n")
 
+        # ── Moment conditions ──
+        if data.conditions_moment:
+            f.write("Begin Conditions PointMomentCondition3D1N\n")
+            for cid in sorted(data.conditions_moment.keys()):
+                c = data.conditions_moment[cid]
+                f.write(f"    {cid} {c['property']} "
+                        f"{' '.join(str(n) for n in c['nodes'])}\n")
+            f.write("End Conditions\n\n")
+
+        # ── Fallback: legacy conditions if no force/moment split ──
+        if not data.conditions_force and not data.conditions_moment:
+            if data.conditions:
+                f.write(f"Begin Conditions {data.condition_type}\n")
+                for cid in sorted(data.conditions.keys()):
+                    c = data.conditions[cid]
+                    f.write(f"    {cid} {c['property']} "
+                            f"{' '.join(str(n) for n in c['nodes'])}\n")
+                f.write("End Conditions\n\n")
+
+        # SubModelParts
         for smp_name, smp in data.sub_model_parts.items():
             _write_smp(f, smp)
             f.write("\n")
@@ -489,30 +550,17 @@ def write_mdpa(data: MdpaData, filename: str):
     print(f"Written: {filename}")
 
 
-def refine_mdpa(input_file: str, output_file: str, subdivisions: int = 2):
-    print(f"Reading: {input_file}")
+def refine_mdpa(input_file, output_file, subdivisions=2, beam_element_ids=None):
     data = parse_mdpa(input_file)
-
-    print(f"Original mesh: {len(data.nodes)} nodes, {len(data.elements)} elements, {len(data.conditions)} conditions")
-
-    print(f"Refining with {subdivisions} subdivisions...")
-    refined = refine_mesh(data, subdivisions)
-
-    print(f"Refined mesh: {len(refined.nodes)} nodes, {len(refined.elements)} elements, {len(refined.conditions)} conditions")
-
+    refined = refine_mesh(data, subdivisions, beam_element_ids)
     write_mdpa(refined, output_file)
+    return refined
 
 
 if __name__ == "__main__":
     import sys
-
     if len(sys.argv) < 3:
-        print("Usage: python mdpa_refiner.py <input.mdpa> <output.mdpa> [subdivisions]")
-        print("  subdivisions: number of subdivisions per element (default: 2)")
+        print("Usage: python mdpa_refiner.py <input> <output> [subdivisions]")
         sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    subdivisions = int(sys.argv[3]) if len(sys.argv) > 3 else 2
-
-    refine_mdpa(input_file, output_file, subdivisions)
+    refine_mdpa(sys.argv[1], sys.argv[2],
+                int(sys.argv[3]) if len(sys.argv) > 3 else 2)

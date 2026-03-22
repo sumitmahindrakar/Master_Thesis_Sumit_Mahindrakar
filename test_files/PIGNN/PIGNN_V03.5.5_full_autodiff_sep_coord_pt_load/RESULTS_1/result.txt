@@ -1,0 +1,154 @@
+coord passed to decoder not normalized
+
+scheduler_step  = 10
+scheduler_gamma = 0.5
+
+fast decay, no learning after nearly 50 epochs
+
+Epoch	LR
+1	1e-3
+50	3.1e-5
+100	9.8e-7
+200	9.5e-10
+300	9.3e-13
+
+model learn trivial solution - zero displacement
+
+
+
+
+
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar
+Working directory: E:\Master_Thesis_Sumit_Mahindrakar\test_files\PIGNN\PIGNN_V03.5.5_full_autodiff_sep_coord_pt_load
+============================================================
+  PIGNN TRAINING — Autograd + Non-dim
+============================================================
+  Device: cuda
+
+── Loading data ──
+  Path: DATA/graph_dataset_norm.pt
+  Loaded 10 graphs
+  Physics scales present ✓
+
+  Data verification:
+    x range:        [0.0000, 1.0000]  (OK [0,1])
+    edge_attr range: [0.0000, 1.0000]  (OK [0,1])
+    coords range:   [0.00, 18.00]  (raw m)
+    prop_E range:   [1.00e+10, 1.00e+10]  (raw Pa)
+    F_ext range:    [-61.81, 0.00]  (raw N)
+    F_c  = 6.1808e+01  (char. force)
+    M_c  = 3.0904e+01  (char. moment)
+    u_c  = 7.7260e-05  (char. disp)
+    θ_c  = 1.5452e-04  (char. rot)
+  Nodes: 212, Elements: 216
+
+── Creating model ──
+
+════════════════════════════════════════════════════════════
+  PIGNN Model Summary (Decoupled Architecture)
+════════════════════════════════════════════════════════════
+  GNN Backbone:
+    Node encoder:  MLP(9 → H)
+    Edge encoder:  MLP(10 → H)
+    MP layers:     6 × GraphNetworkLayer
+  Local Decoder:
+    Input:         H + 3 (context + coords)
+    Output:        15 per node
+  Output layout:
+    [0:3]   displacements: ux, uz, θy
+    [3:6]   face +x forces: Fx, Fz, My
+    [6:9]   face -x forces: Fx, Fz, My
+    [9:12]  face +z forces: Fx, Fz, My
+    [12:15] face -z forces: Fx, Fz, My
+  Hard constraints:
+    Displacement BCs (supports)
+    Face force mask (unconnected)
+  Autograd:
+    Coords decoupled from GNN graph
+    ∂u_i/∂x_j = 0 for i≠j (clean local derivs)
+  Parameters: 754,575
+════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════
+  TRAINING START
+  300 epochs, lr=0.001, device=cuda
+════════════════════════════════════════════════════════════
+
+  Epoch |      Total |       L_eq     L_free      L_sup |        L_N        L_M        L_V |   Disp Err
+  ---------------------------------------------------------------------------------------------------------
+      1 | 2.3049e+02 | 5.0496e-01 0.0000e+00 0.0000e+00 | 2.2979e+02 1.1722e-01 8.0252e-02 | 1.0013e+00
+     10 | 4.1647e-01 | 5.3395e-02 0.0000e+00 0.0000e+00 | 2.8502e-01 4.4121e-04 7.7615e-02 |     ---
+     20 | 1.3714e-01 | 4.3256e-02 0.0000e+00 0.0000e+00 | 1.6553e-02 1.7400e-04 7.7161e-02 |     ---
+     30 | 1.2353e-01 | 3.9409e-02 0.0000e+00 0.0000e+00 | 7.9600e-03 1.1997e-04 7.6043e-02 |     ---
+     40 | 1.1870e-01 | 3.8791e-02 0.0000e+00 0.0000e+00 | 4.5590e-03 8.2795e-05 7.5267e-02 |     ---
+     50 | 1.1847e-01 | 3.8666e-02 0.0000e+00 0.0000e+00 | 4.6860e-03 7.4988e-05 7.5039e-02 | 1.0034e+00
+     60 | 1.1818e-01 | 3.8470e-02 0.0000e+00 0.0000e+00 | 4.7334e-03 6.4640e-05 7.4909e-02 |     ---
+     70 | 1.1809e-01 | 3.8414e-02 0.0000e+00 0.0000e+00 | 4.7728e-03 6.0965e-05 7.4844e-02 |     ---
+     80 | 1.1804e-01 | 3.8386e-02 0.0000e+00 0.0000e+00 | 4.7825e-03 5.9186e-05 7.4813e-02 |     ---
+     90 | 1.1802e-01 | 3.8371e-02 0.0000e+00 0.0000e+00 | 4.7915e-03 5.8315e-05 7.4797e-02 |     ---
+    100 | 1.1801e-01 | 3.8364e-02 0.0000e+00 0.0000e+00 | 4.7964e-03 5.7879e-05 7.4788e-02 | 1.0034e+00
+    110 | 1.1800e-01 | 3.8360e-02 0.0000e+00 0.0000e+00 | 4.7990e-03 5.7657e-05 7.4783e-02 |     ---
+    120 | 1.1800e-01 | 3.8358e-02 0.0000e+00 0.0000e+00 | 4.8004e-03 5.7543e-05 7.4781e-02 |     ---
+    130 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8011e-03 5.7485e-05 7.4780e-02 |     ---
+    140 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8015e-03 5.7455e-05 7.4779e-02 |     ---
+    150 | 1.1799e-01 | 3.8356e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7438e-05 7.4778e-02 | 1.0034e+00
+    160 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7429e-05 7.4778e-02 |     ---
+    170 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7424e-05 7.4778e-02 |     ---
+    180 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4778e-02 |     ---
+    190 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    200 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 | 1.0034e+00
+    210 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    220 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    230 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    240 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    250 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 | 1.0034e+00
+    260 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    270 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    280 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    290 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 |     ---
+    300 | 1.1799e-01 | 3.8357e-02 0.0000e+00 0.0000e+00 | 4.8017e-03 5.7422e-05 7.4777e-02 | 1.0034e+00
+
+  ---------------------------------------------------------------------------------------------------------
+  Training complete: 283.5s (0.95s/epoch)
+  Best total loss: 1.179933e-01
+  History saved: RESULTS\history.pt
+  Loss curves saved: RESULTS\loss_curves.png
+  Total loss saved: RESULTS\total_loss.png
+
+============================================================
+  RESULT ANALYSIS
+============================================================
+
+  Final losses (epoch 300):
+  --------------------------------------------------
+    L_eq       3.835675e-02  not converged
+    L_free     0.000000e+00  (hard constraint)
+    L_sup      0.000000e+00  (hard constraint)
+    L_N        4.801692e-03  partial
+    L_M        5.742176e-05  partial
+    L_V        7.477745e-02  not converged
+    total      1.179933e-01  not converged
+
+  Best losses (epoch 250):
+  --------------------------------------------------
+    L_eq       3.835675e-02  not converged
+    L_free     0.000000e+00  (hard constraint)
+    L_sup      0.000000e+00  (hard constraint)
+    L_N        4.801692e-03  partial
+  Convergence analysis:
+  --------------------------------------------------
+    L_eq       first10=1.1899e-01 last10=3.8357e-02  SLOW (<10x reduction)
+    L_free     first10=0.0000e+00 last10=0.0000e+00  CONVERGED (>100x reduction)
+    L_sup      first10=0.0000e+00 last10=0.0000e+00  CONVERGED (>100x reduction)
+    L_N        first10=2.3952e+01 last10=4.8017e-03  CONVERGED (>100x reduction)
+    L_M        first10=1.4962e-02 last10=5.7422e-05  CONVERGED (>100x reduction)
+    L_V        first10=8.1724e-02 last10=7.4777e-02  SLOW (<10x reduction)
+
+  Displacement error vs Kratos: 1.0034e+00
+  Poor accuracy
+
+============================================================
+  TRAINING COMPLETE
+  Check RESULTS/ for results
+============================================================
