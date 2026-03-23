@@ -33,7 +33,7 @@ from physics_loss import NaivePhysicsLoss
 class TrainConfig:
 
     # ── Data ──
-    data_path       = "DATA/graph_dataset_norm.pt"   # ◀◀◀ CHANGED (was graph_dataset.pt)
+    data_path       = "DATA_15_case/graph_dataset_norm.pt"   # ◀◀◀ CHANGED (was graph_dataset.pt)
     save_dir        = "RESULTS"
 
     # ── Model ──

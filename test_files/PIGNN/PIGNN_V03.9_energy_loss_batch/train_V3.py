@@ -37,24 +37,24 @@ class TrainConfig:
     edge_in_dim     = 7
 
     # ── Training schedule ──
-    epochs          = 15000
+    epochs          = 8000
 
     # Three-phase LR:
     #   Phase 1 (warm-up):   1-200,      ramp 0→lr
     #   Phase 2 (main):      201-3000,   lr
     #   Phase 3 (fine-tune): 3001-8000,  lr/10
-    lr              = 1e-5 #2e-4
-    warmup_epochs   = 1000 #200
-    decay_epoch     = 5000
+    lr              = 1e-4 #2e-4
+    warmup_epochs   = 500 #200
+    decay_epoch     = 3000
     lr_decay_factor = 0.1
     weight_decay    = 0.0
 
     # ── Gradient clipping ──
-    grad_clip       = 1.0 #500.0    # clip gradient norm
-    batch_size      = 16 #4 #32     # 32 (total 400- training 350- 350/16=22 batches per epoch)
+    grad_clip       = 5.0 #500.0    # clip gradient norm
+    batch_size      = 1 #4 #32     # 32 (total 400- training 350- 350/16=22 batches per epoch)
 
     # ── Convergence ──
-    patience        = 2000
+    patience        = 1500
     min_delta       = 1e-3
     smooth_window   = 50       # smooth loss for stopping
 
