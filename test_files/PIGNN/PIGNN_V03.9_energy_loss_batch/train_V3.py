@@ -18,8 +18,12 @@ import torch
 import numpy as np
 from pathlib import Path
 
+CURRENT_SUBFOLDER = Path(__file__).resolve().parent
+os.chdir(CURRENT_SUBFOLDER)
+
 from model import PIGNN
 from energy_loss import FrameEnergyLoss
+from step_2_grapg_constr import FrameData
 
 
 # ════════════════════════════════════════════════
@@ -824,9 +828,6 @@ class Trainer:
 # ════════════════════════════════════════════════
 
 if __name__ == "__main__":
-
-    CURRENT_SUBFOLDER = Path(__file__).resolve().parent
-    os.chdir(CURRENT_SUBFOLDER)
 
     print("=" * 60)
     print("  PIGNN TRAINING — Energy-Based v3")
