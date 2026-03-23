@@ -14,8 +14,13 @@ import torch
 import numpy as np
 from pathlib import Path
 
+CURRENT_SUBFOLDER = Path(__file__).resolve().parent
+os.chdir(CURRENT_SUBFOLDER)
+
+
 from model import PIGNN
 from physics_loss import CorotationalPhysicsLoss
+from step_2_grapg_constr import FrameData
 
 
 # ================================================================
@@ -144,14 +149,19 @@ class Trainer:
             lr=self.cfg.lr,
             weight_decay=self.cfg.weight_decay,
         )
-        self.scheduler = (
-            torch.optim.lr_scheduler
-            .CosineAnnealingWarmRestarts(
-                self.optimizer,
-                T_0=500,
-                T_mult=1,
-                eta_min=1e-6,
-            )
+        # self.scheduler = (
+        #     torch.optim.lr_scheduler
+        #     .CosineAnnealingWarmRestarts(
+        #         self.optimizer,
+        #         T_0=500,
+        #         T_mult=1,
+        #         eta_min=1e-6,
+        #     )
+        # )
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer,
+            T_max=self.cfg.epochs,
+            eta_min=1e-6,
         )
 
     def _get_warmup_lr(self, epoch):
@@ -507,9 +517,6 @@ class Trainer:
 # ================================================================
 
 if __name__ == "__main__":
-
-    CURRENT_SUBFOLDER = Path(__file__).resolve().parent
-    os.chdir(CURRENT_SUBFOLDER)
 
     print("=" * 60)
     print("  PIGNN TRAINING — Corotational")

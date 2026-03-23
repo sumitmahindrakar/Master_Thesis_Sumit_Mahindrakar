@@ -96,7 +96,10 @@ class PIGNN(nn.Module):
 if __name__ == "__main__":
 
     import os
-    os.chdir(r"E:\Master_Thesis_Sumit_Mahindrakar\test_files\PIGNN\PIGNN_V02")
+
+    print(f"Working directory: {os.getcwd()}")
+    os.chdir(r"test_files/PIGNN/PIGNN_V02")#test_files\PIGNN\PIGNN_V02"
+    print(f"Working directory: {os.getcwd()}")
 
     print("=" * 50)
     print("  PIGNN — Smoke Test")

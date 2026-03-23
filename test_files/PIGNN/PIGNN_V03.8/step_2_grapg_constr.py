@@ -38,6 +38,41 @@ try:
 except ImportError:
     raise ImportError("pip install torch-geometric")
 
+# ================================================================
+# CUSTOM DATA CLASS FOR PROPER BATCHING
+# ================================================================
+
+class FrameData(Data):
+    """
+    Custom Data class that tells PyG how to increment
+    custom tensor attributes during batching.
+
+    Without this, 'connectivity' node indices are NOT
+    offset when multiple graphs are collated into a batch,
+    causing elements in graph 1 to reference graph 0's nodes.
+    """
+
+    def __inc__(self, key, value, *args, **kwargs):
+        if key == 'connectivity':
+            return self.num_nodes
+        if key == 'face_element_id':
+            return self.n_elements
+        if key == 'element_map':
+            return self.n_elements
+        return super().__inc__(key, value, *args, **kwargs)
+
+    def __cat_dim__(self, key, value, *args, **kwargs):
+        if key == 'connectivity':
+            return 0
+        if key == 'face_element_id':
+            return 0
+        if key == 'face_mask':
+            return 0
+        if key == 'face_is_A_end':
+            return 0
+        return super().__cat_dim__(key, value, *args, **kwargs)
+    
+
 
 # ================================================================
 # 2A. GRAPH BUILDER
@@ -253,8 +288,100 @@ class FrameGraphBuilder:
 
     # ─── CASE → GRAPH ───
 
+    # def case_to_graph(self, case: dict,
+    #                    case_id: int = 0) -> Data: #Data:
+    #     conn = case['connectivity']
+    #     N = case['n_nodes']
+    #     E = case['n_elements']
+
+    #     edge_index, element_map = self.build_edge_index(conn)
+    #     node_feat = self.build_node_features(case)
+    #     edge_feat = self.build_edge_features(case, element_map)
+    #     node_tgt = self.build_node_targets(case)
+    #     elem_tgt = self.build_element_targets(case)
+
+    #     face_mask, face_element_id, face_is_A_end = \
+    #         self.build_face_assignment(
+    #             conn, case['elem_directions'], N
+    #         )
+
+    #     F_ext = self.build_equivalent_nodal_loads(
+    #         case['point_load'],
+    #         case['point_moment_My'],
+    #         N
+    #     )
+
+    #     data = Data(
+    #         # ── Graph structure ──
+    #         x=torch.tensor(
+    #             node_feat, dtype=torch.float32),
+    #         edge_index=torch.tensor(
+    #             edge_index, dtype=torch.long),
+    #         edge_attr=torch.tensor(
+    #             edge_feat, dtype=torch.float32),
+
+    #         # ── Targets ──
+    #         y_node=torch.tensor(
+    #             node_tgt, dtype=torch.float32),
+    #         y_element=torch.tensor(
+    #             elem_tgt, dtype=torch.float32),
+
+    #         # ── Topology ──
+    #         element_map=torch.tensor(
+    #             element_map, dtype=torch.long),
+    #         connectivity=torch.tensor(
+    #             conn, dtype=torch.long),
+
+    #         # ── Geometry ──
+    #         coords=torch.tensor(
+    #             case['coords'], dtype=torch.float32),
+    #         elem_lengths=torch.tensor(
+    #             case['elem_lengths'], dtype=torch.float32),
+    #         elem_directions=torch.tensor(
+    #             case['elem_directions'], dtype=torch.float32),
+
+    #         # ── Material properties ──
+    #         prop_E=torch.tensor(
+    #             case['young_modulus'], dtype=torch.float32),
+    #         prop_A=torch.tensor(
+    #             case['cross_area'], dtype=torch.float32),
+    #         prop_I22=torch.tensor(
+    #             case['I22'], dtype=torch.float32),
+
+    #         # ── Boundary conditions ──
+    #         bc_disp=torch.tensor(
+    #             case['bc_disp'], dtype=torch.float32),
+    #         bc_rot=torch.tensor(
+    #             case['bc_rot'], dtype=torch.float32),
+
+    #         # ── Loads ──
+    #         F_ext=torch.tensor(
+    #             F_ext, dtype=torch.float32),
+    #         point_moment_My=torch.tensor(
+    #             case['point_moment_My'],
+    #             dtype=torch.float32),
+
+    #         # ── Face assignment ──
+    #         face_mask=torch.tensor(
+    #             face_mask, dtype=torch.float32),
+    #         face_element_id=torch.tensor(
+    #             face_element_id, dtype=torch.long),
+    #         face_is_A_end=torch.tensor(
+    #             face_is_A_end, dtype=torch.long),
+
+    #         # ── Metadata ──
+    #         num_nodes_val=N,
+    #         n_elements=E,
+    #         case_id=case_id,
+    #         nearest_node_id=case['nearest_node_id'],
+    #         traced_element_id=case['traced_element_id'],
+    #     )
+
+    #     return data
+
+    
     def case_to_graph(self, case: dict,
-                       case_id: int = 0) -> Data:
+                       case_id: int = 0) -> FrameData:
         conn = case['connectivity']
         N = case['n_nodes']
         E = case['n_elements']
@@ -276,7 +403,7 @@ class FrameGraphBuilder:
             N
         )
 
-        data = Data(
+        data = FrameData(                          # ← changed
             # ── Graph structure ──
             x=torch.tensor(
                 node_feat, dtype=torch.float32),

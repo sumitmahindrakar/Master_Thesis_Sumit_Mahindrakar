@@ -39,8 +39,8 @@ class TrainConfig:
     # ── Model ──
     hidden_dim      = 128
     n_layers        = 6
-    node_in_dim     = 9
-    edge_in_dim     = 10
+    node_in_dim     = 10
+    edge_in_dim     = 7
 
     # ── Training ──
     epochs          = 300
