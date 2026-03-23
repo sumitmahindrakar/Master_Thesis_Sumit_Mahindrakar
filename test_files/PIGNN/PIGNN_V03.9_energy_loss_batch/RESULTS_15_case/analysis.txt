@@ -1,0 +1,26 @@
+Final Results
+
+Metric	Value	Status
+Π/Π_target	0.9914	✓ CONVERGED (<1% error)
+**U/	W	**
+Displacement error	2.37%	✓ GOOD (<5%)
+Gradient norm	2600 → 720	✓ Decreasing
+Raw output range	[-0.16, 0.99]	✓ O(1)
+
+
+Journey Summary
+Step	Problem	Fix	Result
+1	Force residual loss → zero attractor	Energy-based loss (from paper)	Network escapes zero
+2	Non-zero init bias	Zero-init decoder (from paper)	Correct starting point
+3	U/	W	= 430 (wrong energy)
+4	Oscillation, gradient explosion	Lower LR + grad clip + longer training	2.4% error ✓
+
+
+What Made It Work
+Energy minimization instead of force residual — no zero attractor
+Correct θ sign convention — th_local = -θ_kratos in strain energy
+Zero-init decoder — starts at u=0 where ∇Π = -F_ext ≠ 0
+Momentum-conserving messages — built-in Newton's 3rd law
+Gradient clipping at 500 — prevents spikes
+Three-phase LR — warmup → main → fine-tune
+Separate decoder per DOF — better conditioning
