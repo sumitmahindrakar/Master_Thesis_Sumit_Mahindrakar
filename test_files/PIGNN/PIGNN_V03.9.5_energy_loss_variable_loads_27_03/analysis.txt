@@ -1,0 +1,121 @@
+Actual Data Layout (Correct in Graph Construction)
+Node Features data.x [N, 10]
+Col	Content	Source
+0-2	x, y, z coordinates	case['coords']
+3	bc_disp {0,1}	case['bc_disp']
+4	bc_rot {0,1}	case['bc_rot']
+5	Fx	case['point_load'][:,0]
+6	Fy (=0)	case['point_load'][:,1]
+7	Fz (=0)	case['point_load'][:,2]
+8	My (=0)	case['point_moment_My']
+9	response flag	case['response_node_flag']
+
+
+Edge Features data.edge_attr [2E, 7]
+Col	Content	Source
+0	L_elem	case['elem_lengths']
+1-3	dx, dy, dz	case['elem_directions']
+4	E	case['young_modulus']
+5	A	case['cross_area']
+6	I22	case['I22']
+
+Separate Attributes (NOT touched by MinMaxNormalizer)
+text
+
+data.F_ext          [N, 3]  = [Fx, Fz, My]        ← energy loss uses this
+data.prop_E         [E]     = Young's modulus       ← energy loss uses this
+data.prop_A         [E]     = cross area            ← energy loss uses this
+data.prop_I22       [E]     = I22                   ← energy loss uses this
+data.elem_lengths   [E]     = element lengths       ← energy loss uses this
+data.elem_directions [E,3]  = direction vectors     ← energy loss uses this
+data.connectivity   [E,2]   = node connectivity     ← energy loss uses this
+data.bc_disp        [N,1]   = BC flag               ← model does NOT use this
+
+The energy loss is correctly using physical values from separate attributes. The MinMax normalization of data.x and data.edge_attr only affects the GNN encoder input, not the energy computation.
+
+
+The THREE Real Root Causes
+🔴 Root Cause 1: Missing Boundary Condition Enforcement
+The bug:
+
+Python
+
+# model.py line ~95:
+if hasattr(data, 'bc_mask'):          # ← looks for 'bc_mask'
+    mask = data.bc_mask.to(pred.device)
+    pred[mask] = 0.0
+
+# But graph construction stores:
+data.bc_disp = torch.tensor(...)      # ← attribute is called 'bc_disp'
+# 'bc_mask' NEVER EXISTS → BC enforcement NEVER happens
+Impact: Support nodes can predict nonzero displacements, creating spurious strain energy. For a frame with base supports, this means the model can "slide" the entire frame, creating enormous axial strains in columns.
+
+🔴 Root Cause 2: Shared u_c for ux and uz (Axial Locking)
+The bug in PhysicsScaler.compute_global_scales:
+
+Python
+
+u_c = max(
+    d.y_node[:, 0:2].abs().max().item()   # ← takes max of BOTH ux AND uz
+    for d in data_list
+)
+For your 2-story frame:
+
+text
+
+ux_max = 1.89e-02    ← bending-dominated (large)
+uz_max = 5.22e-04    ← axial-dominated (38× smaller)
+u_c = max(1.89e-02, 5.22e-04) = 1.89e-02   ← set by ux
+Then both DOFs use the same scale:
+
+Python
+
+# energy_loss.py
+u_phys[:, 0] = pred_raw[:, 0] * u_c     # ux: correct scale
+u_phys[:, 1] = pred_raw[:, 1] * u_c     # uz: WRONG, 38× too large!
+
+🔴 Root Cause 3: Catastrophic Gradient Clipping
+The consequence of Root Cause 2:
+
+Quantity	Case 1 (E=25k)	Case 2/3 (E=10¹⁰)
+EA	25,000	10⁹
+EI	2,500	10⁵
+EA/EI	10	10,000
+K̂_axial = EA·u_c/(F_c·L)	25,000	2.4×10⁶
+Initial ∇ norm	~340	~340,000
+Grad clip	500	3
+Effective LR	2.9×10⁻⁴	1.8×10⁻⁹
+Information retained	100%	0.001%
+With effective LR = 1.8×10⁻⁹, the model cannot learn anything.
+
+
+Axial Energy Curriculum added
+gradual increase in axial energy- currently we only have axial load Fx with 20 sample for testing the current algorithm
+
+
+The real challenge is that when non-dimensional stiffness reaches O(1000+), the PIGNN approach breaks down—it was designed for soft tissue with much lower stiffness and manageable condition numbers. For structural frames with E in the GPa range, the stiffness is roughly a million times higher, so I need to rethink the unsupervised training strategy. One possibility is to work in log-domain energy instead of minimizing Π directly, which might help with the numerical conditioning.
+But the better approach is to minimize the residual of the equilibrium equation itself—the force imbalance |∂Π/∂u|². This is what standard PINNs do, and it's elegant because at equilibrium the gradient is zero regardless of stiffness magnitude. The loss would be the sum of squared residuals at each node, and this naturally avoids the ill-conditioning problem since I'm not trying to match absolute energy values, just enforce that forces balance.
+
+Implementing this requires computing gradients of the energy with respect to displacements through automatic differentiation, which is doable but needs careful setup. Alternatively, I could try incremental loading—starting with zero external force and gradually ramping up to the actual load over training epochs, similar to arc-length methods in nonlinear FEM. This keeps the solution trajectory smooth and avoids large jumps that might confuse the network.
+
+For linear problems though, the solution scales proportionally with load, so the ratio of kinetic to potential energy stays constant regardless of magnitude. But the absolute gradient values do shrink when the load is smaller, which might actually help during early training when the network is far from equilibrium and producing near-zero predictions.
+-------
+......But the real issue is that the predictions staying at O(0.001) after all that training reveals the gradients aren't actually consistent; they're oscillating wildly. The stiff energy landscape is causing this: small displacements keep the energy term negligible, so the gradient pushes the parameters outward, but once they move enough, the energy explodes and pushes them back inward, creating a rapid cycle. The oscillation period is tied to 1/sqrt(K̂) ≈ 0.016, which is large relative to the 1e-3 step size, so the optimizer gets trapped in this back-and-forth without making real progress.
+
+LBFGS would help here because it approximates the curvature and takes steps that naturally damp these oscillations rather than fighting them.
+
+For this problem, LBFGS is actually ideal since we're dealing with a quadratic energy landscape and can use the full training batch of 17 graphs as a deterministic loss function. The main constraint is that LBFGS needs a closure function that recomputes the loss multiple times per iteration, but that's manageable. Let me implement this approach with LBFGS as the primary solver.
+
+realizing LBFGS calls the closure multiple times per step for line search, which means with 20 evaluations and 17 graphs, that's 340 forward passes per epoch—but since each pass is under 1ms on GPU, the total time per epoch is only around 0.34 seconds, so 200 epochs would take roughly 70 seconds, which is totally manageable. Now I'm wondering if I even need full LBFGS or if Adam with a higher learning rate and gradient clipping would be simpler and still stable given the stability analysis showed LR_stable ≈ 2.3e-4.
+
+Testing this out: with LR = 2e-4, the soft mode convergence rate would be around 2e-4 per epoch, meaning I'd need about 5000 epochs to converge, which translates to roughly 3.3 minutes of training. That's actually reasonable compared to the earlier problem where LR=1e-3 exceeded the stability limit. So I'm leaning toward offering both options—Adam with LR=2e-4 as the simpler approach that might work, and LBFGS as the more robust fallback that will definitely converge.
+
+Actually, the cleanest solution is Adam with LR=1e-4 and minimal or no gradient clipping, since the gradient norms are only 1-10 and clipping at 200 isn't helping. The oscillation comes from the learning rate being too high, not gradient explosion. At LR=1e-4 I get stability up to Hessian eigenvalues of 20,000, though convergence takes around 10,000 epochs or 7 minutes. Pushing to LR=5e-4 cuts that to 2,000 epochs in 80 seconds but risks stability at higher eigenvalues. The user already tried LR=1e-3 though, so I need to find the sweet spot between convergence speed and stability.
+
+
+
+
+
+
+
+

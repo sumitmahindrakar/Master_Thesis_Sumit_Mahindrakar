@@ -1187,7 +1187,7 @@ def main():
         description="Parametric study for Kratos — per-node loads"
     )
     parser.add_argument(
-        "--config", default="config_dataset2.yaml",#config.yaml config_test.yaml config_test_no_moment.yaml
+        "--config", default="config_dataset1_Fx.yaml",#config.yaml config_test.yaml config_test_no_moment.yaml
         help="Config file path" #config_dataset1_Fx.yaml config_dataset1_Fz.yaml
     ) #config_dataset2.yaml
     parser.add_argument("--dry-run", action="store_true")
