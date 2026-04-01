@@ -42,11 +42,13 @@ class FrameEnergyLoss(nn.Module):
         # ── Physics scales ──
         if hasattr(data, 'batch') and data.batch is not None:
             ux_c    = data.ux_c[data.batch]
-            uz_c    = data.uz_c[data.batch]
+            # uz_c    = data.uz_c[data.batch]
+            uz_c    = data.ux_c[data.batch] # same scale as ux
             theta_c = data.theta_c[data.batch]
         else:
             ux_c    = data.ux_c
-            uz_c    = data.uz_c
+            # uz_c    = data.uz_c
+            uz_c    = data.ux_c # same scale as ux
             theta_c = data.theta_c
 
         # ── Physical displacements ──
@@ -115,23 +117,28 @@ class FrameEnergyLoss(nn.Module):
             be = bn[nA]
             ux_c_A    = data.ux_c[bn[nA]]
             ux_c_B    = data.ux_c[bn[nB]]
-            uz_c_A    = data.uz_c[bn[nA]]
-            uz_c_B    = data.uz_c[bn[nB]]
+            # uz_c_A    = data.uz_c[bn[nA]]
+            # uz_c_B    = data.uz_c[bn[nB]]
+            uz_c_A    = data.ux_c[bn[nA]] # same scale as ux
+            uz_c_B    = data.ux_c[bn[nB]] # same scale as ux
             theta_c_A = data.theta_c[bn[nA]]
             theta_c_B = data.theta_c[bn[nB]]
             E_c_e     = (data.F_c[be] * data.ux_c[be]).clamp(min=1e-30)
             E_c_n     = (data.F_c[bn] * data.ux_c[bn]).clamp(min=1e-30)
             ux_c_n    = data.ux_c[bn]
-            uz_c_n    = data.uz_c[bn]
+            # uz_c_n    = data.uz_c[bn]
+            uz_c_n    = data.ux_c[bn] # same scale as ux
             theta_c_n = data.theta_c[bn]
         else:
             ux_c_A = ux_c_B = data.ux_c
-            uz_c_A = uz_c_B = data.uz_c
+            # uz_c_A = uz_c_B = data.uz_c
+            uz_c_A = uz_c_B = data.ux_c # same scale as ux
             theta_c_A = theta_c_B = data.theta_c
             E_c_e = (data.F_c * data.ux_c).clamp(min=1e-30)
             E_c_n = E_c_e
             ux_c_n = data.ux_c
-            uz_c_n = data.uz_c
+            # uz_c_n = data.uz_c
+            uz_c_n = data.uz_c # same scale as ux
             theta_c_n = data.theta_c
 
         # ── Physical local DOFs ──

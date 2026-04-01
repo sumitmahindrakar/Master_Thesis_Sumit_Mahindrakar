@@ -1,0 +1,327 @@
+L_BFGS for 100 cases cause problem. Reason it avg out the weights which are in opposite direction. So no gradient and step in any direction.
+each graph contribution for test cases is 1/85 only
+
+option try to Adam optimizer with lbfgs or 
+curriculum lbfgs data
+(provide data to train in steps)
+Phase 1 (20 graphs, 5000 steps):
+  → Same as before: error drops to ~22%
+  
+Phase 2 (50 graphs, 3000 steps, starting from 22%):
+  → Error on 50 graphs: ~25-30% initially, drops to ~18-20%
+  
+Phase 3 (85 graphs, 2000 steps, starting from ~20%):
+  → Error on 85 graphs: ~20-22% initially, drops to ~15-18%
+  
+Test set: should be much better than 150% since model 
+  saw diverse data during training
+
+
+current results are as follows.
+train_old3
+======================================================================
+  PIGNN TRAINING — L-BFGS with Auto-Restart v3
+======================================================================
+
+── Loading data ──
+  Loaded 100 graphs from DATA/graph_dataset_norm.pt
+  Nodes: 30, Elements: 30
+  ux_c = 1.8901e-02, uz_c = 5.2222e-04, θ_c = 5.0441e-03
+  F_c = 9.9971e+00, E_c = 1.8895e-01
+  Optimal aw = 1.8750e-03
+  Config: hidden=64, layers=10, seeds=1
+  Split: 85 train, 15 test
+  Target Π/E_c = -4.5484e-01 (aw=1.87e-03)
+  Target U/W   = 0.5000
+
+══════════════════════════════════════════════════════════════════════        
+  L-BFGS TRAINING: 1 seeds × 15000 steps
+  aw=1.87e-03 (constant), history=500, stall_patience=10
+══════════════════════════════════════════════════════════════════════        
+
+── Seed 0 ──────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════
+  PIGNN Model Summary (Energy-Based v2)
+═══════════════════════════════════════════════════════
+  Node input:    10
+  Edge input:    7
+  Hidden dim:    64
+  MP layers:     10
+  Output:        3 (separate decoder per DOF)
+  Decoder init:  SMALL XAVIER (gain=1e-02)
+  Activation:    CELU
+  Message type:  Momentum-conserving
+  ─────────────────────────────────
+  Processor params:   291,840
+  Decoder params:      24,963
+  Total params:       326,851
+═══════════════════════════════════════════════════════
+
+  L-BFGS history coverage: 500/326851 = 0.153%
+        0 | Π=+6.4057e-03 | err=[0.9999,1.0023,1.0004] tot=0.9999 | |∇|=8.68e+00 | pred=[-0.013,0.006] | R=0
+        1 | Π=+3.6172e-04 | err=[0.9998,1.0007,1.0001] tot=0.9999 | |∇|=2.30e+00 | pred=[-0.007,0.003] | R=0
+        2 | Π=-7.1132e-04 | err=[0.9997,1.0001,0.9998] tot=0.9997 | |∇|=4.46e-01 | pred=[-0.005,0.002] | R=0 Δ/step=2.06e-06
+        3 | Π=-1.1134e-03 | err=[0.9996,0.9999,0.9997] tot=0.9997 | |∇|=3.60e-01 | pred=[-0.002,0.003] | R=0 Δ/step=2.02e-06
+        4 | Π=-1.2608e-03 | err=[0.9996,0.9999,0.9996] tot=0.9996 | |∇|=1.32e-01 | pred=[-0.003,0.003] | R=0 Δ/step=1.04e-06
+       50 | Π=-4.7495e-03 | err=[0.9975,1.0001,0.9970] tot=0.9975 | |∇|=9.06e-01 | pred=[-0.026,0.010] | R=0 Δ/step=2.17e-05
+      100 | Π=-6.8335e-03 | err=[0.9968,0.9999,0.9955] tot=0.9968 | |∇|=2.42e-01 | pred=[-0.036,0.013] | R=0 Δ/step=2.80e-05
+      150 | Π=-8.0728e-03 | err=[0.9961,1.0010,0.9945] tot=0.9961 | |∇|=3.99e-01 | pred=[-0.042,0.015] | R=0 Δ/step=1.42e-05
+      200 | Π=-8.7938e-03 | err=[0.9957,1.0018,0.9937] tot=0.9957 | |∇|=3.54e-01 | pred=[-0.045,0.018] | R=0 Δ/step=1.12e-05
+      250 | Π=-9.3175e-03 | err=[0.9954,1.0017,0.9934] tot=0.9953 | |∇|=1.55e-01 | pred=[-0.048,0.019] | R=0 Δ/step=7.27e-06
+      300 | Π=-9.8419e-03 | err=[0.9949,1.0011,0.9928] tot=0.9949 | |∇|=1.82e-01 | pred=[-0.050,0.019] | R=0 Δ/step=7.96e-06
+      350 | Π=-1.0329e-02 | err=[0.9945,1.0009,0.9924] tot=0.9944 | |∇|=1.81e-01 | pred=[-0.050,0.020] | R=0 Δ/step=9.23e-06
+      400 | Π=-1.0845e-02 | err=[0.9939,1.0006,0.9918] tot=0.9939 | |∇|=2.57e-01 | pred=[-0.051,0.019] | R=0 Δ/step=9.92e-06
+      450 | Π=-1.1505e-02 | err=[0.9932,1.0005,0.9909] tot=0.9932 | |∇|=1.58e-01 | pred=[-0.053,0.021] | R=0 Δ/step=1.23e-05
+      500 | Π=-1.2420e-02 | err=[0.9924,1.0027,0.9901] tot=0.9923 | |∇|=3.36e-01 | pred=[-0.053,0.023] | R=0 Δ/step=1.54e-05
+      550 | Π=-1.3748e-02 | err=[0.9906,1.0018,0.9886] tot=0.9905 | |∇|=3.42e-01 | pred=[-0.050,0.025] | R=0 Δ/step=2.64e-05
+      600 | Π=-1.6187e-02 | err=[0.9875,0.9962,0.9862] tot=0.9875 | |∇|=1.01e+00 | pred=[-0.054,0.026] | R=0 Δ/step=4.87e-05
+      650 | Π=-2.0625e-02 | err=[0.9812,0.9920,0.9810] tot=0.9812 | |∇|=7.81e-01 | pred=[-0.051,0.038] | R=0 Δ/step=9.31e-05
+      700 | Π=-2.7964e-02 | err=[0.9705,0.9880,0.9737] tot=0.9706 | |∇|=2.26e+00 | pred=[-0.067,0.057] | R=0 Δ/step=1.69e-04
+      750 | Π=-3.4278e-02 | err=[0.9611,0.9782,0.9671] tot=0.9613 | |∇|=4.52e-01 | pred=[-0.076,0.071] | R=0 Δ/step=1.99e-04
+      800 | Π=-3.9369e-02 | err=[0.9540,0.9678,0.9612] tot=0.9542 | |∇|=1.58e+00 | pred=[-0.092,0.085] | R=0 Δ/step=1.64e-04
+      850 | Π=-4.4538e-02 | err=[0.9462,0.9630,0.9541] tot=0.9464 | |∇|=8.61e-01 | pred=[-0.100,0.100] | R=0 Δ/step=1.48e-04
+      900 | Π=-4.9235e-02 | err=[0.9380,0.9586,0.9452] tot=0.9382 | |∇|=9.68e-01 | pred=[-0.128,0.105] | R=0 Δ/step=1.60e-04
+      950 | Π=-5.3466e-02 | err=[0.9303,0.9553,0.9361] tot=0.9305 | |∇|=1.09e+00 | pred=[-0.126,0.120] | R=0 Δ/step=1.59e-04
+     1000 | Π=-5.7326e-02 | err=[0.9241,0.9518,0.9288] tot=0.9242 | |∇|=1.23e+00 | pred=[-0.136,0.125] | R=0 Δ/step=1.40e-04
+     1050 | Π=-6.0363e-02 | err=[0.9190,0.9545,0.9226] tot=0.9191 | |∇|=7.05e-01 | pred=[-0.133,0.115] | R=0 Δ/step=1.14e-04
+     1100 | Π=-6.2819e-02 | err=[0.9137,0.9586,0.9172] tot=0.9138 | |∇|=5.04e-01 | pred=[-0.139,0.116] | R=0 Δ/step=1.04e-04
+     1150 | Π=-6.5038e-02 | err=[0.9101,0.9559,0.9135] tot=0.9101 | |∇|=1.61e+00 | pred=[-0.141,0.120] | R=0 Δ/step=8.92e-05
+     1200 | Π=-6.6281e-02 | err=[0.9071,0.9578,0.9101] tot=0.9072 | |∇|=4.14e-01 | pred=[-0.138,0.130] | R=0 Δ/step=6.61e-05
+     1250 | Π=-6.8247e-02 | err=[0.9032,0.9540,0.9067] tot=0.9033 | |∇|=5.46e-01 | pred=[-0.137,0.125] | R=0 Δ/step=6.89e-05
+     1300 | Π=-6.9944e-02 | err=[0.8991,0.9535,0.9032] tot=0.8993 | |∇|=1.83e+00 | pred=[-0.136,0.127] | R=0 Δ/step=7.96e-05
+     1350 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=8.03e-01 | pred=[-0.142,0.129] | R=0 Δ/step=4.31e-05
+     1400 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=8.02e-01 | pred=[-0.142,0.129] | R=0 Δ/step=3.04e-06
+     1450 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=8.03e-01 | pred=[-0.142,0.129] | R=0 Δ/step=0.00e+00
+     1500 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=7.76e-01 | pred=[-0.142,0.129] | R=0 Δ/step=-5.96e-09
+     1550 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=7.76e-01 | pred=[-0.142,0.129] | R=0 Δ/step=-5.96e-09
+     1600 | Π=-7.0503e-02 | err=[0.8988,0.9540,0.9032] tot=0.8989 | |∇|=7.76e-01 | pred=[-0.142,0.129] | R=0 Δ/step=0.00e+00
+     1605 | *** RESTART #1 (perturb=0.0030) *** | Π=-7.0503e-02 | err=0.8989
+     1650 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.25e-01 | pred=[-0.141,0.131] | R=1 Δ/step=4.92e-07
+     1700 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.25e-01 | pred=[-0.141,0.131] | R=1 Δ/step=4.92e-07
+     1750 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.26e-01 | pred=[-0.141,0.131] | R=1 Δ/step=0.00e+00
+     1800 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.26e-01 | pred=[-0.141,0.131] | R=1 Δ/step=0.00e+00
+     1850 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.26e-01 | pred=[-0.141,0.131] | R=1 Δ/step=0.00e+00
+     1900 | Π=-7.0489e-02 | err=[0.8988,0.9547,0.9032] tot=0.8989 | |∇|=5.26e-01 | pred=[-0.141,0.131] | R=1 Δ/step=-5.96e-10
+     1905 | *** RESTART #2 (perturb=0.0039) *** | Π=-7.0489e-02 | err=0.8989
+     1950 | Π=-7.1296e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.21e+00 | pred=[-0.147,0.130] | R=2 Δ/step=1.28e-05
+     2000 | Π=-7.1296e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.21e+00 | pred=[-0.147,0.130] | R=2 Δ/step=1.28e-05
+     2050 | Π=-7.1296e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.21e+00 | pred=[-0.147,0.130] | R=2 Δ/step=0.00e+00
+     2100 | Π=-7.1296e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.21e+00 | pred=[-0.147,0.130] | R=2 Δ/step=0.00e+00
+     2150 | Π=-7.1296e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.22e+00 | pred=[-0.147,0.130] | R=2 Δ/step=0.00e+00
+     2200 | Π=-7.1297e-02 | err=[0.8975,0.9544,0.9018] tot=0.8976 | |∇|=2.21e+00 | pred=[-0.147,0.130] | R=2 Δ/step=1.79e-09
+     2214 | *** RESTART #3 (perturb=0.0051) *** | Π=-7.1296e-02 | err=0.8976  
+     2250 | Π=-7.1340e-02 | err=[0.8975,0.9536,0.9019] tot=0.8976 | |∇|=2.85e-01 | pred=[-0.146,0.131] | R=3 Δ/step=-2.88e-07
+     2300 | Π=-7.1340e-02 | err=[0.8975,0.9536,0.9019] tot=0.8976 | |∇|=2.85e-01 | pred=[-0.146,0.131] | R=3 Δ/step=-2.90e-07
+     2350 | Π=-7.1340e-02 | err=[0.8975,0.9536,0.9019] tot=0.8976 | |∇|=2.86e-01 | pred=[-0.146,0.131] | R=3 Δ/step=0.00e+00
+
+
+Deep Analysis: Why uz Won't Converge and the 22% Wall
+The Smoking Gun: Zero Gradient for uz
+Trace the gradient of your loss w.r.t. pred_raw[:, 1] (normalized uz):
+
+External work gradient:
+
+text
+
+∂W/∂pred_uz = F_ext[:, 1] * uz_c / E_c
+But F_ext[:, 1] = 0 for ALL nodes (you only apply Fx loads). So:
+
+∂
+W
+∂
+u
+^
+z
+=
+0
+exactly
+∂ 
+u
+^
+  
+z
+​
+ 
+∂W
+​
+ =0exactly
+
+The only gradient signal for uz comes from bending energy. Let's compute its magnitude for a horizontal element (c=1, s=0):
+
+text
+
+w_A_loc = uz_A = uz_c × pred_uz
+
+∂U_bend/∂pred_uz = 24 × EI/L³ × uz_c² / E_c × pred_uz
+                  = 24 × (1e-5/27) × (3.55e-4)² / 0.133 × pred_uz
+                  ≈ 8.4e-13 × pred_uz
+Compare with ux gradient from external work:
+
+text
+
+∂W/∂pred_ux = Fx × ux_c / E_c = Fx / F_c ≈ O(1)
+Gradient magnitude comparison:
+DOF	Source	Magnitude	Ratio to ux
+pred_ux	External work	O(1)	1
+pred_ux	Axial energy	O(1e-5)	1e-5
+pred_θ	Bending energy	O(1e-7)	1e-7
+pred_uz	Bending energy	O(1e-13)	1e-13
+uz has 13 orders of magnitude less gradient than ux. It is literally invisible to the optimizer. This is not a bug — it's a consequence of Fz=0 combined with uz_c being tiny.
+
+Why ux Plateaus at 22%
+Even for ux, the energy loss has a conditioning problem. The energy weights displacement errors by their stiffness:
+
+Stiff modes (high eigenvalue of K): large energy contribution → learned first
+Soft modes (low eigenvalue): tiny energy contribution → negligible gradient
+At 22% error, the model has captured all high-energy modes. The remaining 22% is in soft modes where:
+
+text
+
+∂Π/∂(soft mode amplitude) ≈ λ_soft × amplitude
+With λ_soft/λ_stiff = 1/22,000,000, these modes contribute ~0.000005% to the energy. The optimizer sees effectively zero gradient for them.
+
+Should You Add Fz Loads? YES — This Is Critical
+Adding Fz loads fixes the problem at its root:
+
+1. Direct gradient signal for uz:
+
+text
+
+∂W/∂pred_uz = Fz × uz_c / E_c ≈ Fz/F_c × (uz_c/ux_c) ≈ 0.027 × Fz/F_c
+This is 10 orders of magnitude larger than the current bending-only gradient.
+
+2. uz_c will increase dramatically. With vertical forces, vertical displacements become much larger. If Fz ~ O(10) like Fx:
+
+text
+
+uz_c_new ≈ F_c × L³/(12EI) = 10 × 27/(12×1e-5) ≈ huge (beam theory)
+Actually this will be limited by the frame connectivity, but uz_c will grow significantly.
+
+3. Better conditioning. The energy landscape becomes more isotropic — all DOFs contribute meaningfully to both strain energy and work.
+
+
+structure is linear elastic: u = K⁻¹F. The true solution satisfies:
+
+u
+(
+F
+x
+,
+F
+z
+)
+=
+u
+(
+F
+x
+,
+0
+)
++
+u
+(
+0
+,
+F
+z
+)
+u(F 
+x
+​
+ ,F 
+z
+​
+ )=u(F 
+x
+​
+ ,0)+u(0,F 
+z
+​
+ )
+
+When you train with Fx∈[-10,10] and Fz∈[-10,10] independently per node, the model must learn how each force component maps to each displacement component. A pure Fx case is just Fz=0, which is interpolation (0 is inside [-10,10]), not extrapolation.
+
+In Fact, Mixed Training Is BETTER for Generalization
+Training data	What model learns	Generalization
+Fx only	Only horizontal force→displacement patterns	❌ Cannot predict Fz response
+Fz only	Only vertical force→displacement patterns	❌ Cannot predict Fx response
+Fx + Fz mixed	Full K⁻¹ mapping	✅ Any combination works
+
+This way you explicitly verify that the model handles single-component loading correctly.
+
+Bottom Line
+Training with richer loads (Fx+Fz) gives the model more information about the structure's behavior, not less. A model that correctly minimizes Π for diverse Fx+Fz combinations has effectively learned K⁻¹, which works for any load combination within the training range.
+
+Go ahead and generate 100 cases with both Fx and Fz. Share results when ready.
+
+Analysis: 84% Error — Much WORSE Than 20 Cases
+Why It's Worse
+You didn't apply the recommended config changes. Compare:
+
+Parameter	Recommended	What You Used	Effect
+lbfgs_history	500	100	Terrible Hessian approximation
+WINDOW_SIZE	300	50 (hardcoded)	Premature restarts
+MAX_RESTARTS	20	10	Ran out of restarts too fast
+Perturbation cap	0.05	uncapped (grew to 0.128)	Large perturbations destroyed progress
+The Killer: Premature Restart at Step 1280
+Look at the trajectory:
+
+text
+
+Step 1000: err=87.4%, Δ/step=1.88e-4  ← STILL ACTIVELY LEARNING
+Step 1050: err=86.3%, Δ/step=2.18e-4  ← ACCELERATING
+Step 1100: err=85.3%, Δ/step=2.11e-4  ← GOOD PROGRESS  
+Step 1150: err=84.6%, Δ/step=1.69e-4  ← STILL MOVING
+Step 1200: err=84.4%, Δ/step=8.82e-5  ← SLOWING BUT NOT DEAD
+Step 1250: err=84.1%, Δ/step=5.33e-5  ← WINDOW_SIZE=50 says "stall"
+Step 1280: *** RESTART #1 *** ← KILLED ACTIVE LEARNING
+The model was improving at 5e-5/step when the restart destroyed it. With 100 graphs, convergence is naturally ~5× slower than 20 graphs (loss averaged over 5× more graphs). WINDOW_SIZE=50 is way too aggressive.
+
+After restart: cascade failure
+text
+
+Step 1280: Restart #1
+Step 1335: Restart #2  ← only 55 steps later!
+Step 1388: Restart #3  ← only 53 steps later!
+...10 restarts in 470 steps → model destroyed
+
+Fix: Apply the Config Changes That Were Recommended
+In train.py, inside train_lbfgs_with_restarts:
+Python
+
+    # ── Window-based stall detection ──
+    loss_window = []
+    err_window  = []
+    WINDOW_SIZE   = 300          # was 50 — MUST be large for 100 graphs
+    STALL_REL_TOL = 1e-4       
+    PERTURB_SCALE = 0.003        # was 0.005
+    PERTURB_GROWTH = 1.3         # was 1.5
+    MAX_PERTURB   = 0.05         # was uncapped
+    MAX_RESTARTS  = 20           # was 10
+And the perturbation line:
+Python
+
+            scale = min(
+                PERTURB_SCALE * (PERTURB_GROWTH ** (n_restarts - 1)),
+                MAX_PERTURB
+            )
+In Config:
+Python
+
+    lbfgs_history   = 500        # was 100
+    lbfgs_steps     = 15000      # was 8000 — need more with 100 graphs
+Expected Behavior After Fix
+With 20 cases, the "active learning" phase (300→400) dropped from 62%→24%. That rapid descent hasn't happened yet with 100 cases — the model at step 1250 was still in the early slow phase, equivalent to step ~200 of the 20-case run.
+
+With proper config:
+
+No restart until at least step 1550 (1250 + 300 window)
+By then the model may have entered its rapid descent phase
+Expected trajectory: slowly grind to ~70%, then rapid drop to ~25-30%
+But ux will still wall at ~22% and uz will stay at ~90%+ because Fz=0. More data helps generalization, not the fundamental gradient problem.
+
+
+
+next update in update_3

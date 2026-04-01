@@ -29,6 +29,7 @@ os.chdir(CURRENT_SUBFOLDER)
 from model import PIGNN
 from energy_loss import FrameEnergyLoss
 from step_2_grapg_constr import FrameData
+from torch_geometric.loader import DataLoader
 
 
 # ════════════════════════════════════════════════
@@ -41,8 +42,13 @@ class Config:
     n_layers     = 10          # keep for full graph coverage
     init_gain    = 0.01
 
-    # L-BFGS
-    lbfgs_steps     = 15000     # long run
+    # Phase 1: Adam mini-batch
+    adam_phase1_epochs = 5000
+    adam_phase1_lr     = 1e-3
+    batch_size         = 16       # ~5 mini-batches per epoch
+
+    # Phase 2: L-BFGS
+    lbfgs_steps     = 0     # lbfgs long run
     lbfgs_lr        = 1.0
     lbfgs_history   = 500
     lbfgs_max_iter  = 20
@@ -52,11 +58,14 @@ class Config:
     # Multiple seeds
     n_seeds         = 1        # try 3 random initializations
 
-    # Optional gentle Adam polish (after L-BFGS)
-    adam_epochs     = 2000
-    adam_lr         = 1e-6     # very small
+    # Phase 3: Optional gentle Adam polish (after L-BFGS)
+    adam_epochs     = 3000
+    adam_lr         = 1e-5     # very small
     adam_lr_min     = 1e-8
     grad_clip       = 5.0      # tight clip
+
+    # Anti-overfitting (ADD THESE)
+    weight_decay    = 0#1e-4          # L2 regularization in Adam- Causing Oscillation
 
     # General
     train_ratio  = 0.85
@@ -80,11 +89,13 @@ def compute_disp_error(pred_raw, batch):
     with torch.no_grad():
         if hasattr(batch, 'batch') and batch.batch is not None:
             ux_c = batch.ux_c[batch.batch]
-            uz_c = batch.uz_c[batch.batch]
+            # uz_c = batch.uz_c[batch.batch]
+            uz_c = batch.ux_c[batch.batch]    # ← CHANGED: use ux_c
             th_c = batch.theta_c[batch.batch]
         else:
             ux_c = batch.ux_c
-            uz_c = batch.uz_c
+            # uz_c = batch.uz_c
+            uz_c = batch.ux_c    # ← CHANGED: use ux_c
             th_c = batch.theta_c
 
         pred_phys = torch.stack([
@@ -152,9 +163,81 @@ def load_data():
 
 
 # ════════════════════════════════════════════════
-# L-BFGS training with auto-restart
+# Adam optimizer Phase 1
 # ════════════════════════════════════════════════
 
+def train_adam_minibatch(model, train_graphs, loss_fn, optimal_aw, cfg, device, test_batch=None):
+    """Phase 1: Adam with mini-batches to handle gradient conflict."""
+    model.to(device).train()
+    
+    loader = DataLoader(train_graphs, batch_size=cfg.batch_size, shuffle=True)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_phase1_lr, weight_decay=cfg.weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=cfg.adam_phase1_epochs, eta_min=cfg.adam_phase1_lr / 100
+    )
+    
+    best_err = 999.
+    best_state = None
+    
+    for epoch in range(cfg.adam_phase1_epochs):
+        epoch_loss = 0.
+        n_batches = 0
+        
+        for batch in loader:
+            batch = batch.to(device)
+            optimizer.zero_grad()
+            pred = model(batch)
+            loss, _, _, _ = loss_fn.compute(pred, batch, axial_weight=optimal_aw)
+            loss.backward()
+            clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            optimizer.step()
+            epoch_loss += loss.item()
+            n_batches += 1
+        
+        scheduler.step()
+        
+        # Evaluate on full training set every log_every epochs
+        if epoch % cfg.log_every == 0 or epoch < 5:
+            full_batch = Batch.from_data_list(train_graphs).to(device)
+            with torch.no_grad():
+                pred_full = model(full_batch)
+            err = compute_disp_error(pred_full, full_batch)
+            lr = optimizer.param_groups[0]['lr']
+            
+            if err[0] < best_err:
+                best_err = err[0]
+                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            
+            _, ld, _, _ = loss_fn.compute(pred_full, full_batch, axial_weight=optimal_aw)
+            
+            # ADD: test eval
+            if test_batch is not None:
+                with torch.no_grad():
+                    pred_test = model(test_batch)
+                err_test = compute_disp_error(pred_test, test_batch)
+                test_str = f" | test={err_test[0]:.4f}"
+            else:
+                test_str = ""
+
+            print(
+                f"    {epoch:5d} | "
+                f"Π={ld['Pi']:+.4e} | "
+                f"err=[{err[1]:.4f},{err[2]:.4f},{err[3]:.4f}] "
+                f"tot={err[0]:.4f} | "
+                f"{test_str} | " 
+                f"lr={lr:.2e} | "
+                f"pred=[{pred_full.min().item():.3f},{pred_full.max().item():.3f}]"
+            )
+    
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    
+    print(f"\n    Adam Phase 1 done: best_err={best_err:.4f}")
+    return best_err, best_state
+# ════════════════════════════════════════════════
+# L-BFGS training with auto-restart
+# ════════════════════════════════════════════════
 def train_lbfgs_with_restarts(
     model, train_batch, loss_fn, optimal_aw, cfg, device,
     seed_id=0
@@ -373,7 +456,7 @@ def adam_polish(model, train_batch, loss_fn, optimal_aw,
     model.to(device).train()
 
     optimizer = torch.optim.Adam(
-        model.parameters(), lr=cfg.adam_lr
+        model.parameters(), lr=cfg.adam_lr, weight_decay=cfg.weight_decay
     )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=cfg.adam_epochs,
@@ -507,16 +590,19 @@ def main():
         if hasattr(train_batch, 'batch') \
                 and train_batch.batch is not None:
             ux_c_t = train_batch.ux_c[train_batch.batch]
-            uz_c_t = train_batch.uz_c[train_batch.batch]
+            # uz_c_t = train_batch.uz_c[train_batch.batch]
+            uz_c_t = train_batch.ux_c[train_batch.batch]
             th_c_t = train_batch.theta_c[train_batch.batch]
         else:
             ux_c_t = train_batch.ux_c
-            uz_c_t = train_batch.uz_c
+            # uz_c_t = train_batch.uz_c
+            uz_c_t = train_batch.ux_c
             th_c_t = train_batch.theta_c
 
         true_raw = torch.stack([
             true_d[:, 0] / ux_c_t,
-            true_d[:, 1] / uz_c_t,
+            # true_d[:, 1] / uz_c_t,
+            true_d[:, 1] / ux_c_t,            # ← CHANGED: use ux_c
             true_d[:, 2] / th_c_t,
         ], dim=1)
         true_raw = torch.nan_to_num(true_raw, 0.0)
@@ -542,6 +628,7 @@ def main():
 
     best_overall_err = 999.
     best_overall_state = None
+    best_seed = 0
     all_histories = []
 
     for seed in range(cfg.n_seeds):
@@ -572,6 +659,17 @@ def main():
             assert p.abs().max() > 1e-8, "Zero init!"
 
         # Train
+        # ── Phase 1: Adam mini-batch ──
+        print(f"\n    Phase 1: Adam mini-batch (bs={cfg.batch_size}, "
+              f"lr={cfg.adam_phase1_lr:.0e}, {cfg.adam_phase1_epochs} epochs)")
+        
+        err_adam, state_adam = train_adam_minibatch(
+            model, train_graphs, loss_fn, optimal_aw, cfg, device
+        )
+        
+        # ── Phase 2: L-BFGS polish from Adam result ──
+        print(f"\n    Phase 2: L-BFGS polish from err={err_adam:.4f}")
+
         err, loss, hist = train_lbfgs_with_restarts(
             model, train_batch, loss_fn, optimal_aw,
             cfg, device, seed_id=seed

@@ -25,7 +25,7 @@ from torch_geometric.nn import MessagePassing
 class MLP(nn.Module):
     """MLP with CELU activation and optional LayerNorm."""
 
-    def __init__(self, dims, layer_norm=False):
+    def __init__(self, dims, layer_norm=False, dropout=0.0):
         super().__init__()
         self.layers = nn.ModuleList()
         for i in range(len(dims) - 1):
@@ -33,12 +33,15 @@ class MLP(nn.Module):
         self.layer_norm = (
             nn.LayerNorm(dims[-1]) if layer_norm else None
         )
+        self.dropout = nn.Dropout(dropout) if dropout > 0 else None
 
     def forward(self, x):
         for i, layer in enumerate(self.layers):
             x = layer(x)
             if i < len(self.layers) - 1:
                 x = F.celu(x)
+                if self.dropout is not None:
+                    x = self.dropout(x)
         if self.layer_norm is not None:
             x = self.layer_norm(x)
         return x
@@ -188,9 +191,29 @@ class PIGNN(nn.Module):
         self.final_norm = nn.LayerNorm(2 * H)
 
         # ── Separate decoder per DOF ──
-        self.decoder_ux = MLP([2 * H, H, 1])
-        self.decoder_uz = MLP([2 * H, H, 1])
-        self.decoder_th = MLP([2 * H, H, 1])
+        self.decoder_ux = MLP([2 * H, H, 1], dropout=0.0)
+        self.decoder_uz = MLP([2 * H, H, 1], dropout=0.0)
+        self.decoder_th = MLP([2 * H, H, 1], dropout=0.0)
+
+        # For dropout
+        # self.decoder_ux = nn.Sequential(
+        #     nn.Linear(2 * H, H),
+        #     nn.CELU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(H, 1)
+        # )
+        # self.decoder_uz = nn.Sequential(
+        #     nn.Linear(2 * H, H),
+        #     nn.CELU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(H, 1)
+        # )
+        # self.decoder_th = nn.Sequential(
+        #     nn.Linear(2 * H, H),
+        #     nn.CELU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(H, 1)
+        # )
 
         # ══ FIXED: Small Xavier init (not zero) ══
         self._init_decoders(gain=decoder_init_gain)
@@ -210,15 +233,25 @@ class PIGNN(nn.Module):
           → Small enough that energy doesn't explode
           → Large enough for meaningful gradients everywhere
         """
+        # with torch.no_grad():
+        #     for decoder in [self.decoder_ux,
+        #                     self.decoder_uz,
+        #                     self.decoder_th]:
+        #         last = decoder.layers[-1]
+        #         nn.init.xavier_uniform_(
+        #             last.weight, gain=gain
+        #         )
+        #         nn.init.zeros_(last.bias)
+
+        # For dropout
         with torch.no_grad():
-            for decoder in [self.decoder_ux,
-                            self.decoder_uz,
-                            self.decoder_th]:
-                last = decoder.layers[-1]
-                nn.init.xavier_uniform_(
-                    last.weight, gain=gain
-                )
-                nn.init.zeros_(last.bias)
+            for decoder in [self.decoder_ux, self.decoder_uz, self.decoder_th]:
+                # Find last Linear layer
+                for module in reversed(list(decoder.modules())):
+                    if isinstance(module, nn.Linear):
+                        nn.init.xavier_uniform_(module.weight, gain=gain)
+                        nn.init.zeros_(module.bias)
+                        break
 
     def forward(self, data):
         """
