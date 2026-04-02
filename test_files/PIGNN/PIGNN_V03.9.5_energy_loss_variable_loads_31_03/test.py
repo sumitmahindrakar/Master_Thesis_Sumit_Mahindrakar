@@ -10,11 +10,11 @@ from step_2_grapg_constr import FrameData
 
 import torch
 
-data = torch.load("DATA/graph_dataset.pt")
+data = torch.load("DATA_400mixedcase_2setWithDiffParam/graph_dataset.pt")
 
 print(type(data))
-print(data[180])
-g = data[180]
+# print(data[50])
+g = data[200]
 
 # for key, value in g.to_dict().items():
 #     print(f"\n{key}:")
@@ -101,8 +101,8 @@ g = data[180]
 # print(g.face_is_A_end)
 
 # # ===== External forces =====i think it is correct. issue to be discussed with Prof.
-print("\nF_ext:")# end node have half of element load . UDL*length/2 per element contribution on one node
-print(g.F_ext) # in interior 2 element contribution on 1 node so they are UDL*length/2 *2
+# print("\nF_ext:")# end node have half of element load . UDL*length/2 per element contribution on one node
+# print(g.F_ext) # in interior 2 element contribution on 1 node so they are UDL*length/2 *2
 
 # # ===== Metadata =====
 # print("\nnum_nodes_val:")
@@ -119,3 +119,43 @@ print(g.F_ext) # in interior 2 element contribution on 1 node so they are UDL*le
 
 # print("\ntraced_element_id:")
 # print(g.traced_element_id)
+
+import torch
+
+data = torch.load("DATA_400mixedcase_2setWithDiffParam/graph_dataset.pt")
+
+# Initialize containers
+prop_E_all = []
+prop_A_all = []
+prop_I22_all = []
+F_ext_all = []
+
+for g in data:
+    prop_E_all.append(g.prop_E.view(-1))
+    prop_A_all.append(g.prop_A.view(-1))
+    prop_I22_all.append(g.prop_I22.view(-1))
+    F_ext_all.append(g.F_ext.view(-1))
+
+# Concatenate everything into single tensors
+prop_E_all = torch.cat(prop_E_all)
+prop_A_all = torch.cat(prop_A_all)
+prop_I22_all = torch.cat(prop_I22_all)
+F_ext_all = torch.cat(F_ext_all)
+
+def analyze(name, tensor):
+    unique_vals = torch.unique(tensor)
+    print(f"\n===== {name} =====")
+    print(f"Min: {tensor.min().item()}")
+    print(f"Max: {tensor.max().item()}")
+    print(f"Number of unique values: {len(unique_vals)}")
+    
+    if len(unique_vals) < 10:
+        print("Unique values:", unique_vals)
+    else:
+        print("Sample unique values:", unique_vals[:10])
+
+# Run analysis
+analyze("prop_E", prop_E_all)
+analyze("prop_A", prop_A_all)
+analyze("prop_I22", prop_I22_all)
+analyze("F_ext", F_ext_all)

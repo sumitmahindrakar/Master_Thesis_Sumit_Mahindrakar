@@ -688,7 +688,7 @@ def visualize_frame_graph(data: Data,
 
         fx = x_feat[i, 5]
         if abs(fx) > 1e-10:
-            scale = 0.02
+            scale = 0.0002
             ax.annotate(
                 '', xy=(xp, zp),
                 xytext=(xp - fx * scale, zp),
@@ -700,7 +700,7 @@ def visualize_frame_graph(data: Data,
 
         fz = x_feat[i, 7]
         if abs(fz) > 1e-10:
-            scale = 0.02
+            scale = 0.0002
             ax.annotate(
                 '', xy=(xp, zp),
                 xytext=(xp, zp - fz * scale),

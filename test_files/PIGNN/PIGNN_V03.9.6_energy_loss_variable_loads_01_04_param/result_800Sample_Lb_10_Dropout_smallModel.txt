@@ -1,0 +1,55 @@
+Dropout = 0.0 in model
+
+material Properties:
+
+Fx/Fz=[-10000 10000]
+youngs_modulus=2.1e11
+I22=1.5e-4
+cross_area=0.01
+Samples= 800 (split=0.825)
+
+class Config:
+    # Model
+    hidden_dim   = 24
+    n_layers     = 10
+    init_gain    = 0.01
+
+    # Loss mode
+    use_residual_loss = False   # True = ||∂Π/∂u||²,  False = Π (energy)
+
+    # Phase 1: Adam mini-batch
+    adam_phase1_epochs = 5000
+    adam_phase1_lr     = 1e-3
+    batch_size         = 16
+
+    # Phase 2: uz-focused (decoder_uz only)
+    uz_epochs    = 0
+    uz_lr        = 1e-3
+
+    # Phase 3: L-BFGS
+    lbfgs_steps     = 0
+    lbfgs_lr        = 1.0
+    lbfgs_history   = 500
+    lbfgs_max_iter  = 20
+    stall_patience  = 10
+
+    # Multiple seeds
+    n_seeds         = 1
+
+    # Phase 4: Adam polish
+    adam_epochs     = 2000
+    adam_lr         = 1e-5
+    adam_lr_min     = 1e-8
+    grad_clip       = 5.0
+
+    # Regularization
+    weight_decay    = 0
+
+    # General
+    train_ratio  = 0.85
+    log_every    = 50
+    device       = 'cuda' if torch.cuda.is_available() else 'cpu'
+    save_dir     = 'RESULTS'
+
+    # Physics scaling flag
+    use_ux_for_uz = True

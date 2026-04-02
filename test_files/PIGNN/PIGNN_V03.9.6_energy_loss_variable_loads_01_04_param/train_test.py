@@ -43,7 +43,7 @@ from torch_geometric.loader import DataLoader
 
 class Config:
     # Model
-    hidden_dim   = 32
+    hidden_dim   = 28
     n_layers     = 10
     init_gain    = 0.01
 
@@ -51,7 +51,7 @@ class Config:
     use_residual_loss = False   # True = ||∂Π/∂u||²,  False = Π (energy)
 
     # Phase 1: Adam mini-batch
-    adam_phase1_epochs = 1000
+    adam_phase1_epochs = 5000
     adam_phase1_lr     = 1e-3
     batch_size         = 16
 
@@ -70,7 +70,7 @@ class Config:
     n_seeds         = 1
 
     # Phase 4: Adam polish
-    adam_epochs     = 1000
+    adam_epochs     = 2000
     adam_lr         = 1e-5
     adam_lr_min     = 1e-8
     grad_clip       = 5.0
@@ -85,7 +85,7 @@ class Config:
     save_dir     = 'RESULTS'
 
     # Physics scaling flag
-    use_ux_for_uz = False
+    use_ux_for_uz = True
 
 
 # ════════════════════════════════════════════════
@@ -278,6 +278,7 @@ def ensure_forward_mask(data_list):
 
 def load_data():
     paths = ["DATA/graph_dataset_norm.pt", "DATA/graph_dataset.pt"]
+    # paths = ["DATA_400mixedcase_2setWithDiffParam/graph_dataset_norm.pt", "DATA_400mixedcase_2setWithDiffParam/graph_dataset.pt"]
     for p in paths:
         if os.path.exists(p):
             data_list = torch.load(p, weights_only=False)
