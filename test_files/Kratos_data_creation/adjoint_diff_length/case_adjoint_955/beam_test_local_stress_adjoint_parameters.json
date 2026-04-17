@@ -1,0 +1,650 @@
+{
+    "problem_data": {
+        "problem_name": "Beam_structure",
+        "start_time": 0.0,
+        "end_time": 1.0,
+        "parallel_type": "OpenMP",
+        "echo_level": 1
+    },
+    "solver_settings": {
+        "solver_type": "adjoint_static",
+        "analysis_type": "linear",
+        "model_part_name": "Structure",
+        "domain_size": 3,
+        "time_stepping": {
+            "time_step": 1.0
+        },
+        "compute_reactions": false,
+        "move_mesh_flag": false,
+        "response_function_settings": {
+            "response_type": "adjoint_local_stress",
+            "analyzer": "kratos",
+            "gradient_mode": "semi_analytic",
+            "step_size": 1e-06,
+            "adapt_step_size": true,
+            "traced_element_id": 27,
+            "stress_type": "MY",
+            "stress_treatment": "node",
+            "stress_location": 1
+        },
+        "sensitivity_settings": {
+            "sensitivity_model_part_name": "sensitivity_mp",
+            "nodal_solution_step_sensitivity_variables": [
+                "SHAPE_SENSITIVITY"
+            ],
+            "element_data_value_sensitivity_variables": [
+                "I22"
+            ],
+            "condition_data_value_sensitivity_variables": [],
+            "build_mode": "static"
+        },
+        "echo_level": 0,
+        "rotation_dofs": true,
+        "model_import_settings": {
+            "input_type": "mdpa",
+            "input_filename": "Frame_structure_refined"
+        },
+        "material_import_settings": {
+            "materials_filename": "materials_beam.json"
+        }
+    },
+    "processes": {
+        "constraints_process_list": [
+            {
+                "python_module": "assign_vector_variable_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.DISPLACEMENT_support",
+                    "variable_name": "ADJOINT_DISPLACEMENT",
+                    "constrained": [
+                        true,
+                        true,
+                        true
+                    ],
+                    "value": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_variable_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.ROTATION_support",
+                    "variable_name": "ADJOINT_ROTATION",
+                    "constrained": [
+                        false,
+                        false,
+                        false
+                    ],
+                    "value": [
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            }
+        ],
+        "loads_process_list": [
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_2",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 10184.522985221472,
+                    "direction": [
+                        0.3507836528416808,
+                        0.0,
+                        -0.9364565280348293
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_3",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 3439.141011837706,
+                    "direction": [
+                        -0.013040955271921261,
+                        0.0,
+                        -0.999914963127163
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_4",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 1301.7568916154592,
+                    "direction": [
+                        -0.4357704913535378,
+                        0.0,
+                        0.9000578197346526
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_5",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_6",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_7",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 8549.589522073298,
+                    "direction": [
+                        -0.038089911583607625,
+                        0.0,
+                        -0.9992743160091491
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_8",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 8160.438484974401,
+                    "direction": [
+                        0.023493372083924723,
+                        0.0,
+                        0.9997239926440329
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_9",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_10",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 8498.522862188916,
+                    "direction": [
+                        -0.8219981926974578,
+                        0.0,
+                        -0.5694900975452629
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_11",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_13",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 4281.814188783396,
+                    "direction": [
+                        0.9753614050477658,
+                        0.0,
+                        0.22061307654635529
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_14",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 9640.198182325761,
+                    "direction": [
+                        0.4976070522880727,
+                        0.0,
+                        -0.8674025717699799
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_15",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 5010.782420910571,
+                    "direction": [
+                        -0.9960796289406619,
+                        0.0,
+                        0.08846113728317719
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_16",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 9462.1421013554,
+                    "direction": [
+                        0.9962793084907997,
+                        0.0,
+                        0.08618317395578988
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_17",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 10169.338651979657,
+                    "direction": [
+                        -0.18658940408510366,
+                        0.0,
+                        -0.982437984955369
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_18",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 8810.2761273414,
+                    "direction": [
+                        0.9889527407327341,
+                        0.0,
+                        0.14823115933302877
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_19",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 5192.549581008633,
+                    "direction": [
+                        -0.8055305034307366,
+                        0.0,
+                        -0.5925543080955739
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_20",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_21",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 9791.951678742053,
+                    "direction": [
+                        0.9943446842101563,
+                        0.0,
+                        -0.10620098390789297
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_22",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 8719.637138299,
+                    "direction": [
+                        0.9941328789271456,
+                        0.0,
+                        -0.10816570175441559
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_23",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 6834.782651197102,
+                    "direction": [
+                        0.9116173433008872,
+                        0.0,
+                        -0.4110399243297815
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_24",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 4038.7590875448614,
+                    "direction": [
+                        -0.040011436022960374,
+                        0.0,
+                        -0.9991992218708842
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_25",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 0.0,
+                    "direction": [
+                        0.0,
+                        0.0,
+                        -1.0
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_26",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 7300.4039086868115,
+                    "direction": [
+                        0.24265551671063668,
+                        0.0,
+                        -0.9701125193553035
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_27",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 10348.426755453878,
+                    "direction": [
+                        -0.7080919807037669,
+                        0.0,
+                        0.7061202070915521
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_28",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 11329.93594705852,
+                    "direction": [
+                        -0.5790909149103276,
+                        0.0,
+                        0.8152629712358581
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_29",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 10555.657273602857,
+                    "direction": [
+                        -0.38494682677751113,
+                        0.0,
+                        -0.922938752330795
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            },
+            {
+                "python_module": "assign_vector_by_direction_to_condition_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure.AutoForce_node_30",
+                    "variable_name": "POINT_LOAD",
+                    "modulus": 4941.424759499239,
+                    "direction": [
+                        -0.7220747401814097,
+                        0.0,
+                        -0.6918150544704486
+                    ],
+                    "interval": [
+                        0.0,
+                        "End"
+                    ]
+                }
+            }
+        ],
+        "list_other_processes": [
+            {
+                "kratos_module": "KratosMultiphysics.HDF5Application",
+                "python_module": "single_mesh_temporal_input_process",
+                "Parameters": {
+                    "model_part_name": "Structure",
+                    "file_settings": {
+                        "file_access_mode": "read_only"
+                    },
+                    "nodal_solution_step_data_settings": {
+                        "list_of_variables": [
+                            "DISPLACEMENT",
+                            "ROTATION"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    "output_processes": {
+        "vtk_output": [
+            {
+                "python_module": "vtk_output_process",
+                "kratos_module": "KratosMultiphysics",
+                "Parameters": {
+                    "model_part_name": "Structure",
+                    "output_path": "vtk_output_adjoint",
+                    "file_format": "ascii",
+                    "output_precision": 7,
+                    "output_control_type": "step",
+                    "output_interval": 1,
+                    "nodal_solution_step_data_variables": [
+                        "ADJOINT_DISPLACEMENT",
+                        "ADJOINT_ROTATION"
+                    ],
+                    "nodal_data_value_variables": [
+                        "SHAPE_SENSITIVITY"
+                    ],
+                    "element_data_value_variables": [
+                        "I22_SENSITIVITY"
+                    ],
+                    "condition_data_value_variables": []
+                }
+            }
+        ]
+    }
+}

@@ -43,7 +43,7 @@ from torch_geometric.loader import DataLoader
 
 class Config:
     # Model
-    hidden_dim   = 28
+    hidden_dim   = 32
     n_layers     = 10
     init_gain    = 0.01
 
@@ -53,7 +53,7 @@ class Config:
     # Phase 1: Adam mini-batch
     adam_phase1_epochs = 5000
     adam_phase1_lr     = 1e-3
-    batch_size         = 16
+    batch_size         = 32
 
     # Phase 2: uz-focused (decoder_uz only)
     uz_epochs    = 0
